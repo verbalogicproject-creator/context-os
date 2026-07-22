@@ -63,9 +63,13 @@ SOURCE_EXTENSIONS: frozenset[str] = frozenset(
 
 
 def parse_python_imports(content: str) -> List[str]:
-    """Extract dotted module targets from Python `import` / `from ... import` statements."""
+    """Extract dotted module targets from Python `import` / `from ... import` statements.
+
+    Leading whitespace is allowed so imports nested in `try/except` blocks or functions
+    (a common pattern for optional dependencies) are captured, not just top-level ones.
+    """
     imports = []
-    for match in re.finditer(r"^(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))", content, re.MULTILINE):
+    for match in re.finditer(r"^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))", content, re.MULTILINE):
         module = match.group(1) or match.group(2)
         imports.append(module)
     return imports
@@ -209,10 +213,32 @@ def resolve_import(
 ) -> Optional[Tuple[str, str]]:
     """Resolve an import string to a `(dir, stem)` pair naming a real project file.
 
-    Tries, in order: relative imports (`./foo`, `../bar`), absolute-style imports
-    (`@/lib/foo`, `src/lib/foo`), and dotted imports (`services.game_runtime`).
-    Returns None if nothing in the scanned project matches.
+    Tries, in order: Python relative dotted imports (`.rooms`, `..models.embeddings`),
+    JS/TS relative imports (`./foo`, `../bar`), absolute-style imports (`@/lib/foo`,
+    `src/lib/foo`), and dotted imports (`services.game_runtime`). Returns None if nothing
+    in the scanned project matches.
     """
+    # Python relative dotted import: a leading dot with no slash — `.rooms`,
+    # `..models.embeddings`, `. ` (bare). The number of leading dots is how many package
+    # levels to climb; the remainder is a dotted module path under that level.
+    if imp.startswith(".") and "/" not in imp:
+        dots = len(imp) - len(imp.lstrip("."))
+        remainder = imp[dots:]
+        base = source_dir
+        for _ in range(dots - 1):
+            base = posixpath.dirname(base)
+        target_path = (
+            posixpath.normpath(posixpath.join(base, remainder.replace(".", "/")))
+            if remainder
+            else base
+        )
+        tgt_dir, tgt_stem = posixpath.dirname(target_path), posixpath.basename(target_path)
+        for f in all_files.get(tgt_dir, ()):
+            if Path(f).stem == tgt_stem:
+                return tgt_dir, Path(f).stem
+        return None
+
+    # JS/TS relative import: `./foo`, `../bar/baz`
     if imp.startswith("."):
         parts = imp.split("/")
         if len(parts) > 1:

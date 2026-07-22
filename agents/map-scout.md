@@ -51,10 +51,15 @@ with `Read`, then `Edit` that map:
   didn't read.
 - **Types.** Refine the `[type]` tag if the scanner's filename heuristic guessed
   wrong (you now know what the file does).
-- **Cross-boundary edges.** Add `~>` for state/store reads and `=>` for HTTP/endpoint
-  calls the import scanner can't see — but ONLY when you verified it in source. For a
-  target in another folder, add an `## External` group listing it `[ext]` (or a
-  sibling reference), not a dangling edge.
+- **Cross-boundary edges.** The per-folder skeleton only carries edges *within* a folder.
+  When you verify in source that this folder depends on another — a plain `->` import of
+  another folder's module, a `~>` state/store read, or a `=>` HTTP call — represent the
+  other folder **at folder granularity**: add an `## External` group with a `[ext]` node
+  named for that folder or system, point the edge at it, and record it in the frontmatter
+  `depends_on`. See `demo/web/map-web.ngf.md` for the exact shape. The scanner resolves
+  most `->` imports (including Python relative `from .x import` and imports nested in
+  `try/except`), so also add any real import edge it genuinely missed — never leave a
+  dangling edge to an undefined node, and only add an edge you actually saw in source.
 - **Entry + noise.** Mark real entry point(s) `@entry`; `collapse`
   (`... (N) : a, b, c [type]`) low-signal repetitive nodes (e.g. 10 near-identical
   tests) so the map stays token-tight.

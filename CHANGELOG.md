@@ -5,6 +5,21 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-22
+
+Fixes from the first live enrichment run on a real Python repo.
+
+### Fixed
+- **Scanner now resolves Python relative imports** (`from .rooms import`,
+  `from ..models.x import`) and **imports nested in `try/except`/functions** (indented).
+  Previously these `->` edges were dropped from the skeleton and had to be repaired by
+  hand during enrichment. (`scan.py`; regression tests in `tests/test_scan_imports.py`.)
+
+### Changed
+- `map-scout` agent: documented how to represent a **cross-folder `->` dependency**
+  (folder-granularity `[ext]` node + edge + `depends_on`), pointing at the `demo/`
+  convention — previously only `~>`/`=>` cross-boundary edges were spelled out.
+
 ## [0.1.0] — 2026-07-22
 
 Initial release.
