@@ -466,6 +466,101 @@ def write_ngf_skeletons(
     return written, skipped
 
 
+# ---------------------------------------------------------------------------
+# Per-folder structural digests — cheap enrichment input for map-enricher
+# ---------------------------------------------------------------------------
+
+# Real structural declarations only — keyword-led defs, plus module-level *exported* bindings.
+# Bare `const/let/var` (local variables) are deliberately excluded as noise.
+_DECL_RE = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:public\s+|private\s+|protected\s+|internal\s+)?(?:async\s+)?"
+    r"(?:def|class|func|function|fun|interface|type|struct|enum|trait|fn|object)\b"
+    r"|^\s*export\s+(?:default\s+)?(?:async\s+)?(?:const|let|var)\s+\w"
+)
+
+# License/copyright headers are not a description — skip them when picking the leading doc.
+_LICENSE_RE = re.compile(r"copyright|licen[sc]e|spdx|all rights reserved|apache license|mit license", re.I)
+
+
+def _leading_doc(lines: List[str]) -> str:
+    """Condense a file's leading docstring / top comment block into one short line.
+
+    Skips license/copyright boilerplate so a file's real purpose (not its header) is picked.
+    """
+    picked: List[str] = []
+    for raw in lines[:60]:
+        s = raw.strip()
+        if not s:
+            if picked:
+                break
+            continue
+        if s[:3] in ('"""', "'''") or s[:1] == "#" or s[:2] in ("//", "/*") or s[:1] == "*":
+            cleaned = s.strip("\"'/#*<!->- ").strip()
+            if cleaned and not _LICENSE_RE.search(cleaned):
+                picked.append(cleaned)
+            if len(picked) >= 2:
+                break
+        else:
+            break
+    return " ".join(picked)[:200]
+
+
+def file_digest(path: Path, rel: str, *, max_decls: int = 30) -> str:
+    """A compact, cheap-to-read digest of one file: leading doc + imports + top-level declarations.
+
+    Includes the file's imports so `map-enricher` can see its dependencies (and describe it)
+    WITHOUT opening the whole body — it falls back to a full read only when the digest is
+    genuinely insufficient.
+    """
+    try:
+        content = path.read_text(errors="ignore")
+    except OSError:
+        return f"# {rel}\n"
+    lines = content.splitlines()
+    parts = [f"# {rel}"]
+    doc = _leading_doc(lines)
+    if doc:
+        parts.append(f"  · {doc}")
+    parser = IMPORT_PARSERS.get(path.suffix)
+    if parser:
+        imps = list(dict.fromkeys(parser(content)))
+        if imps:
+            parts.append("  imports: " + ", ".join(imps)[:300])
+    decls: List[str] = []
+    for ln in lines:
+        if _DECL_RE.match(ln):
+            decls.append("  " + ln.strip()[:120])
+            if len(decls) >= max_decls:
+                break
+    parts.extend(decls)
+    return "\n".join(parts) + "\n"
+
+
+def build_folder_digests(root: Path, result: ScanResult) -> Dict[str, str]:
+    """One digest text per folder (concatenated file digests), keyed by repo-relative dir."""
+    by_dir: Dict[str, List[ScanNode]] = defaultdict(list)
+    for n in result.nodes:
+        by_dir[n.dir].append(n)
+    digests: Dict[str, str] = {}
+    for d, nodes in by_dir.items():
+        digests[d] = "\n".join(
+            file_digest(root / n.path, n.path) for n in sorted(nodes, key=lambda x: x.path)
+        )
+    return digests
+
+
+def write_digests(root: Path, result: ScanResult) -> int:
+    """Write per-folder digests under `<root>/.context-os/digests/<folder>/digest.txt`. Returns count."""
+    count = 0
+    for d, text in build_folder_digests(root, result).items():
+        base = "root" if d == "" else d
+        dest = root / ".context-os" / "digests" / base / "digest.txt"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text)
+        count += 1
+    return count
+
+
 def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
     """Scan `root` and return the whole-repo grounded skeleton.
 
@@ -573,6 +668,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="With --emit-ngf: overwrite existing maps (default: skip them, never clobber enrichment)",
     )
+    parser.add_argument(
+        "--emit-digests",
+        action="store_true",
+        help="Write per-folder structural digests under .context-os/digests/ (cheap enrichment input)",
+    )
     args = parser.parse_args(argv)
 
     root = args.root.resolve()
@@ -609,8 +709,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"wrote {len(written)} map skeleton(s) + index into {root}")
         if skipped:
             print(f"skipped {len(skipped)} existing map(s) (use --overwrite to replace): {', '.join(skipped[:5])}")
+    if args.emit_digests:
+        n = write_digests(root, result)
+        print(f"wrote {n} folder digest(s) into {root}/.context-os/digests")
 
-    if args.stdout or not (args.json or args.ctx or args.emit_ngf):
+    if args.stdout or not (args.json or args.ctx or args.emit_ngf or args.emit_digests):
         print(json.dumps(result.to_dict(), indent=2))
 
     print(

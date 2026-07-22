@@ -7,9 +7,12 @@ example of its output, see `demo/`, which carries real, committed maps.)
 
 - `.claude-plugin/plugin.json` — plugin manifest (metadata only; dirs auto-discovered).
 - `commands/*.md` — the four slash commands (`/context-os`, `/context-os-update`,
-  `/context-os-status`, `/snapshot`).
-- `agents/*.md` — `map-scout` (generate) and `map-updater` (drift-only refresh), pinned
-  `model: sonnet`.
+  `/context-os-status`, `/snapshot`). `/context-os` is the **orchestrator**: it runs the
+  deterministic scan, then (for the enriched tiers) fans out one `map-enricher` per folder in
+  parallel; `--skeleton` skips enrichment entirely, `--premium` runs the enrichers on Sonnet.
+- `agents/*.md` — `map-enricher` (enriches ONE folder's map, `model: haiku`) and `map-updater`
+  (drift-only refresh, `model: sonnet`). (The old monolithic `map-scout` was retired in v0.2 —
+  its work is split between the command orchestrator and the per-folder `map-enricher`.)
 - `hooks/` — `hooks.json` + `pre_tool_use.py` / `post_tool_use.py` / `_common.py`: the
   drift hooks that keep each map's `staleness` flag honest.
 - `scripts/` — stdlib-only, offline:

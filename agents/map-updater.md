@@ -90,5 +90,5 @@ reporting done.
 - Never remove a node without confirming its file is gone, and never without naming it
   in your report.
 - Never touch CLAUDE.md / AGENTS.md except through `claudemd_splice.py`.
-- Never regenerate everything from scratch when a targeted diff suffices — that's
-  `map-scout`'s job on a fresh project, not yours.
+- Never regenerate everything from scratch when a targeted diff suffices — that's a full
+  `/context-os` generate's job on a fresh project, not yours.

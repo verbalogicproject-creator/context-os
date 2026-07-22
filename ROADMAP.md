@@ -1,8 +1,17 @@
 # Roadmap
 
-v0.1 ships the core: per-folder maps, structural-hash drift detection via Claude Code
-hooks, the CLAUDE.md/AGENTS.md pointer, and `/snapshot`. The items below are researched,
-scoped enhancements — not yet built.
+v0.1 shipped the core: per-folder maps, structural-hash drift detection via Claude Code
+hooks, the CLAUDE.md/AGENTS.md pointer, and `/snapshot`.
+
+**v0.2 shipped generation-cost tiers** (from the memorylog- dogfood, where map generation was
+~45% of a session): a free `--skeleton` structural tier, sharded per-folder `map-enricher`
+agents on Haiku (default) with `--premium` for Sonnet, and per-folder structural digests so
+enrichers read signatures not whole files. Next levers below:
+
+- **Wire the digest deeper + measure.** Confirm the Haiku-on-digest quality bar against Sonnet
+  on a few real repos; tune the digest (more languages, better doc extraction) and the batch size.
+
+The items below are researched, scoped, and not yet built.
 
 ## Git integration (the human + CI loop)
 

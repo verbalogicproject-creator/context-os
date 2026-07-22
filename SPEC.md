@@ -51,7 +51,7 @@ that is the whole point.)
 | `last_verified` | ISO date the map was last generated/updated against source. |
 | `file_count` | Source files in the folder. |
 
-**Written by the enrichment pass (`map-scout`) — the governance card:**
+**Written by the enrichment pass (`map-enricher`; skipped in `--skeleton`/`--fast` mode) — the governance card:**
 
 | Field | Meaning |
 |---|---|

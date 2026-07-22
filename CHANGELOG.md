@@ -5,6 +5,31 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-22
+
+Generation cost optimization — prompted by the memorylog- dogfood, where the monolithic
+`map-scout` spent ~410k tokens (~45% of the session) mapping 50 folders in one growing
+context on a premium model.
+
+### Added
+- **`/context-os --skeleton` (`--fast`) — a free structural tier.** Runs only the deterministic
+  pipeline (scan → stamp → splice → audit), no LLM: real nodes + `->` edges + drift + pointer,
+  in seconds at ~$0. Skeleton maps omit descriptions and the risk card.
+- **`/context-os --premium`** — runs the enrichers on Sonnet for best prose/risk quality.
+- **Per-folder structural digests** (`scan.py --emit-digests`, `folder_digest()`): a file's
+  leading doc + declaration signatures + imports, so an enricher writes descriptions without
+  reading whole bodies. Skips license headers and local-variable noise. Tests in `tests/test_digest.py`.
+
+### Changed
+- **Sharded enrichment.** `/context-os` is now an orchestrator: scan → fan out one **`map-enricher`
+  per folder in parallel** (isolated small contexts) → stamp/splice/audit. This replaces the single
+  growing context — the core cost fix. New agent `agents/map-enricher.md`, `model: haiku` (the cheap
+  default). `audit.py check` still gates fabrication across every shard.
+
+### Removed
+- The monolithic **`map-scout`** agent — its work is split between the command orchestrator and the
+  per-folder `map-enricher`.
+
 ## [0.1.1] — 2026-07-22
 
 Fixes from the first live enrichment run on a real Python repo.

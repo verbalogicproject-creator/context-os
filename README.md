@@ -47,6 +47,20 @@ short pointer into `CLAUDE.md` and `AGENTS.md` (so both Claude and Codex/Gemini 
 maps), and prints the token-save number. From then on, an agent reads the map for the
 folder it's working in instead of re-scanning everything.
 
+### Generation tiers — pick your cost
+
+Generating the maps has three tiers on a dial (the structure, drift, and pointer are the
+same in all three — only the prose enrichment differs):
+
+| Invocation | Enrichment | Cost |
+|---|---|---|
+| `/context-os --skeleton` (`--fast`) | none — structure + drift + pointer only, **no LLM** | ~free, seconds |
+| `/context-os` (default) | descriptions + risk cards, by a **parallel fan-out of small per-folder agents** (Haiku) | cheap |
+| `/context-os --premium` | same, enrichers run on **Sonnet** for best quality | higher |
+
+Start with `--skeleton` for a free structural map; upgrade to full enrichment when you want
+the prose and risk cards.
+
 ## The four commands
 
 | Command | What it does |
@@ -93,7 +107,7 @@ continues from where you stopped — no prior coordination.
 
 ```
 commands/   the four slash commands
-agents/     map-scout (generate) + map-updater (drift-only refresh)
+agents/     map-enricher (per-folder, parallel) + map-updater (drift-only refresh)
 hooks/      the drift hooks (hooks.json + handlers)
 scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, snapshot.py (stdlib only)
 demo/       a tiny two-service app with real, committed context-os output

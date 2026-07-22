@@ -1,33 +1,24 @@
 ---
 description: Map this project into portable per-folder context files so a fresh session reads a cheap map instead of re-scanning your whole repo, and drop a pointer into CLAUDE.md + AGENTS.md
-argument-hint: [project-root] (optional — defaults to the current directory)
+argument-hint: "[project-root] [--skeleton|--fast] [--premium] (root defaults to cwd)"
 ---
 
 # /context-os
 
-Give this project a set of small, always-current architecture maps — one per folder
-plus a root index — so Claude (and Codex, and Gemini) stop re-discovering your codebase
-from scratch every session.
+Give this project a set of small, always-current architecture maps — one per folder plus a
+root index — so Claude (and Codex, and Gemini) stop re-discovering your codebase from scratch
+every session.
 
-## What this does
+## Three tiers (pick with a flag)
 
-Dispatches the `map-scout` agent (`${CLAUDE_PLUGIN_ROOT}/agents/map-scout.md`) against
-`$1` (default: the current working directory) to:
+| Invocation | What it does | Cost |
+|---|---|---|
+| `/context-os --skeleton` (or `--fast`) | Structure-only: real nodes + `->` edges + drift baseline + pointer. No descriptions, no risk cards, **no LLM**. | ~free, seconds |
+| `/context-os` (default) | Full maps — descriptions, verified edges, and a safe-edit/risk card — enriched by a **fan-out of small per-folder agents in parallel** (Haiku). | cheap |
+| `/context-os --premium` | Same, but the per-folder enrichers run on **Sonnet** for the best prose/risk quality. | higher |
 
-1. Run the deterministic scanner (`${CLAUDE_PLUGIN_ROOT}/scripts/scan.py --emit-ngf`) to
-   write grounded skeletons — one `map-{folder}.ngf.md` per folder + a root
-   `index.ngf.md`, every node a real file, every `->` edge a real resolved import.
-2. Read the real files and enrich each map: one-line descriptions, verified `~>`/`=>`
-   edges, `@entry` markers, `collapse` for noise, and the frontmatter governance card
-   (`safe_edit_points` / `risk_areas`) grounded in what would actually break.
-3. Stamp the drift baseline (`ctx_staleness.py stamp-all`) into every map's frontmatter.
-4. Write (or refresh) the marker-delimited pointer block in **CLAUDE.md and AGENTS.md**
-   via the deterministic splice helper — never a free-form edit. (Claude reads the
-   CLAUDE.md one; the AGENTS.md one makes the maps discoverable to Codex/Gemini too.)
-5. Verify itself with `audit.py check` before reporting done, and print the token-save
-   number (`audit.py savings`).
-
-If maps already exist, prefer `/context-os-update` for a lighter, drift-only refresh.
+The deterministic scanner + drift stamp + pointer splice + fabrication audit are the same in
+all three; only the enrichment differs.
 
 ## Request
 
@@ -35,10 +26,50 @@ $ARGUMENTS
 
 ## Protocol
 
-1. **Resolve the project root.** Use `$1` if given, else the current working directory.
-   Confirm it looks like a real project (has source files) before proceeding.
-2. **Dispatch `map-scout`** with `{project_root}`. Let it run its full
-   scan → enrich → stamp → splice → self-verify protocol.
-3. **Report** exactly what `map-scout` returns: the maps written, the pointer blocks
-   spliced (and any `.bak`), the `check` result, and the `savings` line. If `check`
-   fails, this is not done — surface it and let `map-scout` fix it first.
+1. **Parse flags + resolve root.** Root = the first non-flag arg, else the current directory
+   (confirm it has source files). Detect `--skeleton`/`--fast` and `--premium`. Everywhere below,
+   `${CLAUDE_PLUGIN_ROOT}` is this plugin's script/agent dir.
+
+2. **Scan → grounded skeletons** (all tiers):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scan.py" "<root>" --emit-ngf --emit-digests
+   ```
+   This writes one `map-{folder}.ngf.md` per folder + `index.ngf.md`, and (for the enriched
+   tiers) a per-folder structural digest under `<root>/.context-os/digests/`.
+
+3. **Enrich** — branch on the tier:
+
+   - **`--skeleton`/`--fast`:** skip enrichment entirely. Go straight to step 4.
+
+   - **default / `--premium`:** read `<root>/index.ngf.md` for the folder list, then **dispatch one
+     `context-os:map-enricher` agent per folder**, in **parallel batches of ~8–12** (wait for each
+     batch before the next). Give each `{project_root, folder}`. For **`--premium`**, dispatch each
+     enricher with the **Sonnet** model; otherwise use its default (Haiku). Each enricher fills its
+     own map's descriptions, edges, and risk card in isolation and returns one line. If an enricher
+     fails, note the folder and continue — its map stays a valid skeleton.
+     Then **enrich the index yourself**: give each folder node in `index.ngf.md` a one-line
+     description derived from that folder's now-enriched map (cheap — read each map's title line).
+
+4. **Stamp the drift baseline** (all tiers):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ctx_staleness.py" stamp-all "<root>"
+   ```
+
+5. **Write the pointer block into CLAUDE.md AND AGENTS.md** — via the splice helper only:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claudemd_splice.py" claudemd "<root>/CLAUDE.md"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claudemd_splice.py" claudemd "<root>/AGENTS.md"
+   ```
+   If either reports `REFUSED` (malformed markers, usually a hand-edit), stop and report it — do not
+   fix the file yourself.
+
+6. **Self-verify + report:**
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" check "<root>"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" savings "<root>"
+   ```
+   `check` must PASS (every node traces to a real file — across all shards). Report the tier used,
+   the maps written/enriched, the pointer splice result, the `check` result, and the `savings` line.
+   If `check` fails, this is not done — surface it and fix the offending map first.
+
+If maps already exist, prefer `/context-os-update` for a lighter, drift-only refresh.

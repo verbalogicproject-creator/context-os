@@ -61,6 +61,16 @@ Now just work normally. Because of the pointer, a fresh session reads the map fo
 folder it's touching instead of re-scanning your repo. You don't do anything — that's the
 point.
 
+**Cost tiers.** Enrichment (the descriptions + risk cards) is the only part that costs tokens,
+so `/context-os` has a dial:
+- `/context-os --skeleton` (or `--fast`) — structure + drift + pointer only, **no LLM**: free and
+  instant. Great for a first look or CI. (No descriptions or risk cards.)
+- `/context-os` — full maps, enriched by a **parallel fan-out of small per-folder agents** on Haiku
+  (cheap). This is the default.
+- `/context-os --premium` — same, on Sonnet, for the best prose and risk cards.
+
+Start `--skeleton`, upgrade when you want the prose.
+
 ---
 
 ## 3. The four commands
