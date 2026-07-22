@@ -1,0 +1,30 @@
+# Build / runtime noise
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Secrets / env — never commit
+.env
+.env.*
+*.key
+*.pem
+
+# Data artifacts this plugin must never ship
+*.db
+
+# Timestamped backups produced by scripts/claudemd_splice.py
+*.bak
+
+# OS noise
+.DS_Store
+
+# Vendored reference implementations — build scaffolding, not ship artifacts
+reference/
+
+# Vouch session ledger (local, not shipped)
+.vouch/

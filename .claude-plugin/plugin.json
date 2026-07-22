@@ -1,0 +1,21 @@
+{
+  "name": "context-os",
+  "version": "0.1.0",
+  "description": "Stop Claude burning your tokens re-exploring your own code every session. context-os maps your repo into small, portable context files — one per folder plus a root index — that Claude (or Codex, or Gemini) reads on demand instead of re-scanning your whole project. It keeps the maps honest: a drift check flags a map the moment its folder's code changes, so a stale map warns you instead of quietly lying. And /snapshot captures your current session — a compacted summary plus the work state — into one portable file, so you can stop mid-task, move to another machine or another model, and pick up cold. Four commands (/context-os, /context-os-update, /context-os-status, /snapshot), three agents, a drift-detection hook, and a printed token-save number measured against your real source every run. It never invents files or connections — every node traces to real code — and never touches your existing CLAUDE.md beyond its own marked block. Free, offline, $0, no server, no API keys, stdlib-only scanner.",
+  "author": {
+    "name": "Eyal Nof",
+    "email": "verbalogic.project@gmail.com"
+  },
+  "homepage": "https://verbalogix.com",
+  "license": "Apache-2.0",
+  "keywords": [
+    "architecture",
+    "context",
+    "documentation",
+    "token-savings",
+    "claude-md",
+    "portability",
+    "snapshot",
+    "session-handoff"
+  ]
+}

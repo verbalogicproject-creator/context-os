@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: python -m pip install pytest
+
+      - name: Unit tests
+        run: python -m pytest tests/ -q
+
+      - name: Smoke — generate + verify on a copy of the demo
+        run: |
+          cp -r demo /tmp/demo-smoke
+          find /tmp/demo-smoke -name '*.ngf.md' -delete
+          python3 scripts/scan.py /tmp/demo-smoke --emit-ngf
+          python3 scripts/ctx_staleness.py stamp-all /tmp/demo-smoke
+          python3 scripts/audit.py check /tmp/demo-smoke
+          python3 scripts/ctx_staleness.py status /tmp/demo-smoke
+          python3 scripts/audit.py savings /tmp/demo-smoke
+
+      - name: Committed demo maps must be current (drift gate)
+        run: |
+          python3 scripts/audit.py check demo
+          python3 scripts/ctx_staleness.py status demo
