@@ -20,7 +20,8 @@ example of its output, see `demo/`, which carries real, committed maps.)
   - `claudemd_splice.py` — the ONLY code path allowed to write the CLAUDE.md/AGENTS.md
     marked block.
   - `audit.py` — the `.ngf.md`-aware `.ctx` parser + `check` (derive-don't-fabricate, + an
-    advisory dangling-edge pass) + `savings` (the CEILING) + `session-savings` (DELIVERED).
+    advisory dangling-edge pass) + `savings` (the CEILING) + `session-savings` (DELIVERED) +
+    `repair-targets` (folders the orchestrator re-enriches when an enricher left a bad map).
   - `ctx_staleness.py` — the structural-hash engine (`signature`/`stamp`/`flip`/`status`);
     map writes are atomic and malformed frontmatter fails loudly.
   - `session_log.py` — the per-session read ledger (`.context-os/reads-<session>.jsonl`):

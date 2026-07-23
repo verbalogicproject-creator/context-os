@@ -5,6 +5,29 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-07-23
+
+Post-dogfood hardening. The v0.3.1 "measure, don't claim" work was validated by the first real
+end-to-end run of the parallel Haiku enricher fan-out (ARIA-Therapeutic: 77 folders, 554 files,
+Python+TS+React). The orchestration held (~86s wall-clock for a 10-folder parallel batch, ~6.8×
+over serial; digest sufficed for 6/10 folders), but surfaced two first-pass Haiku error classes on
+real messy code — both caught by the audit layer. This release hardens against them and makes the
+orchestration self-heal.
+
+### Added
+- **Orchestrator repair loop (`audit.py repair-targets` + `/context-os` step 4).** After enrichment,
+  `repair-targets` lists exactly the folders whose map has a fabricated node or a dangling edge
+  (same predicates as `check`, factored into shared helpers so they can't drift); the orchestrator
+  re-dispatches enrichers for only those folders, bounded to 2 rounds, so a stray Haiku slip
+  self-heals instead of leaving the whole map set failing. Tests in `test_audit_ngf.py`.
+
+### Changed
+- **`agents/map-enricher.md` hardened** on the two observed failure modes: keep the scanner's
+  disambiguated `dir/stem` node names verbatim (never shorten a collision name to its bare stem —
+  that fabricates a node the audit can't trace), and an edge target is a node name, never prose
+  (`~> chat`, not `~> chat store for messages`). Re-running the two offending ARIA folders with the
+  hardened prompt produced a clean `check` PASS.
+
 ## [0.3.1] — 2026-07-23
 
 "Measure, don't claim." A Scientifix-Council review found the savings machinery measured the

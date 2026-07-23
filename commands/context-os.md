@@ -50,12 +50,25 @@ $ARGUMENTS
      Then **enrich the index yourself**: give each folder node in `index.ngf.md` a one-line
      description derived from that folder's now-enriched map (cheap — read each map's title line).
 
-4. **Stamp the drift baseline** (all tiers):
+4. **Repair loop** (enriched tiers only — skip for `--skeleton`): before stamping, catch any map an
+   enricher left broken. Default Haiku output is not always ship-clean first-pass — the two common
+   slips are a renamed node (a disambiguated `dir/stem` name shortened to its bare stem → fails the
+   fabrication gate) and a prose edge target (`~> chat store for messages` instead of `~> chat`).
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" repair-targets "<root>"
+   ```
+   This prints the repo-relative folders whose map has a fabricated node or a dangling edge. If the
+   list is **non-empty**, re-dispatch a `context-os:map-enricher` for **exactly those folders** (same
+   tier/model as step 3), then run `repair-targets` again. Repeat at most **2 rounds**. If a folder
+   still fails after 2 rounds, leave it, name it in the final report, and suggest `--premium`
+   (Sonnet) or a manual look — never hand-fix the map yourself.
+
+5. **Stamp the drift baseline** (all tiers):
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ctx_staleness.py" stamp-all "<root>"
    ```
 
-5. **Write the pointer block into CLAUDE.md AND AGENTS.md** — via the splice helper only:
+6. **Write the pointer block into CLAUDE.md AND AGENTS.md** — via the splice helper only:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claudemd_splice.py" claudemd "<root>/CLAUDE.md"
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claudemd_splice.py" claudemd "<root>/AGENTS.md"
@@ -63,13 +76,14 @@ $ARGUMENTS
    If either reports `REFUSED` (malformed markers, usually a hand-edit), stop and report it — do not
    fix the file yourself.
 
-6. **Self-verify + report:**
+7. **Self-verify + report:**
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" check "<root>"
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" savings "<root>"
    ```
    `check` must PASS (every node traces to a real file — across all shards). Report the tier used,
-   the maps written/enriched, the pointer splice result, the `check` result, and the `savings` line.
-   If `check` fails, this is not done — surface it and fix the offending map first.
+   the maps written/enriched, any folders the repair loop re-ran (and any it couldn't fix), the
+   pointer splice result, the `check` result, and the `savings` line. If `check` still fails after
+   the repair loop, surface it plainly — do not report success.
 
 If maps already exist, prefer `/context-os-update` for a lighter, drift-only refresh.

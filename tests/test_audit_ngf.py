@@ -67,3 +67,26 @@ def test_edge_advisory_flags_dangling_target_without_failing(tmp_path):
     result = audit.check_maps_fabrication(tmp_path)
     assert result.ok  # advisory only: every node is real, so the fabrication gate still passes
     assert any("ghosttarget" in w for w in result.edge_warnings)
+
+
+def test_repair_targets_empty_on_clean_maps(tmp_path):
+    _emit(tmp_path)
+    assert audit.repair_targets(tmp_path) == []
+
+
+def test_repair_targets_flags_folder_with_fabricated_node(tmp_path):
+    _emit(tmp_path)
+    map_path = tmp_path / "s" / "map-s.ngf.md"
+    map_path.write_text(
+        map_path.read_text().replace("## Files", "## Files\n  ghost : nope.py [component]")
+    )
+    assert audit.repair_targets(tmp_path) == ["s"]
+
+
+def test_repair_targets_flags_folder_with_dangling_edge(tmp_path):
+    _emit(tmp_path)
+    map_path = tmp_path / "s" / "map-s.ngf.md"
+    map_path.write_text(
+        map_path.read_text().replace("## Files", "## Files\n  a : local [component] -> ghosttarget")
+    )
+    assert "s" in audit.repair_targets(tmp_path)

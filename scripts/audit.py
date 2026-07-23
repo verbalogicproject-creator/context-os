@@ -352,6 +352,20 @@ def find_map_files(root: Path) -> List[Path]:
     return maps
 
 
+def _node_is_grounded(root: Path, node: CtxNode, ground_truth_names) -> bool:
+    """A non-`[ext]` node is grounded iff its name is a real scanned node or a real directory."""
+    if node.name in ground_truth_names:
+        return True
+    return node.type == "dir" and (root / node.name).is_dir()
+
+
+def _edge_is_dangling(edge: CtxEdge, all_node_names) -> bool:
+    """An edge is dangling iff its target names no node in any map (index→map links exempt)."""
+    if edge.target.endswith(".ngf.md"):
+        return False
+    return edge.target not in all_node_names
+
+
 def check_maps_fabrication(root: Path) -> FabricationAuditResult:
     """Derive-don't-fabricate across the whole map set: every node traces to real code.
 
@@ -374,9 +388,7 @@ def check_maps_fabrication(root: Path) -> FabricationAuditResult:
             if node.type == "ext":
                 exempt += 1
                 continue
-            if node.name in ground_truth_names:
-                continue
-            if node.type == "dir" and (root / node.name).is_dir():
+            if _node_is_grounded(root, node, ground_truth_names):
                 continue
             findings.append(
                 FabricationFinding(
@@ -390,16 +402,12 @@ def check_maps_fabrication(root: Path) -> FabricationAuditResult:
     # Advisory: an edge whose target names no node anywhere in the map set is likely a
     # wrong or dangling edge (a stem collision the scanner resolved to nothing, or a
     # hand-edit). Not a fabrication (nodes are all real), so it warns but never fails.
-    edge_warnings: List[str] = []
-    for map_name, edge in all_edges:
-        # A `.ngf.md` target is an index→map navigation link (by design), not a node ref.
-        if edge.target.endswith(".ngf.md"):
-            continue
-        if edge.target not in all_node_names:
-            edge_warnings.append(
-                f"in {map_name}: {edge.source} {edge.op} {edge.target} — "
-                f"target '{edge.target}' is not a node in any map"
-            )
+    edge_warnings: List[str] = [
+        f"in {map_name}: {edge.source} {edge.op} {edge.target} — "
+        f"target '{edge.target}' is not a node in any map"
+        for map_name, edge in all_edges
+        if _edge_is_dangling(edge, all_node_names)
+    ]
 
     return FabricationAuditResult(
         ok=not findings,
@@ -409,6 +417,41 @@ def check_maps_fabrication(root: Path) -> FabricationAuditResult:
         format_error=None,
         edge_warnings=edge_warnings,
     )
+
+
+def repair_targets(root: Path) -> List[str]:
+    """Repo-relative folders whose `map-*.ngf.md` has a fabricated node or a dangling edge.
+
+    The set of folders the orchestrator should RE-ENRICH — using the same predicates as
+    `check` so the two can't drift. The root `index.ngf.md` is excluded: it is emitted
+    deterministically, not written by an enricher, so a problem there needs a re-emit, not
+    a re-enrich.
+    """
+    scan_result = scan_module.scan(root)
+    ground_truth_names = scan_result.node_names()
+    parsed = {}
+    all_node_names: set = set()
+    for map_path in find_map_files(root):
+        nodes, edges, _warnings = parse_ctx_file(map_path)
+        parsed[map_path] = (nodes, edges)
+        all_node_names.update(node.name for node in nodes)
+
+    targets: set = set()
+    for map_path, (nodes, edges) in parsed.items():
+        if not map_path.name.startswith("map-"):  # skip index.ngf.md
+            continue
+        has_fabrication = any(
+            node.type != "ext" and not _node_is_grounded(root, node, ground_truth_names)
+            for node in nodes
+        )
+        has_dangling = any(_edge_is_dangling(edge, all_node_names) for edge in edges)
+        if has_fabrication or has_dangling:
+            try:
+                rel = map_path.parent.resolve().relative_to(root.resolve()).as_posix()
+            except ValueError:
+                rel = str(map_path.parent)
+            targets.add("." if rel == "" else rel)
+    return sorted(targets)
 
 
 def compute_maps_token_report(root: Path) -> TokenReport:
@@ -508,6 +551,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     check_p = sub.add_parser("check", help="Derive-don't-fabricate across every map-*.ngf.md + index.ngf.md")
     check_p.add_argument("root", type=Path)
 
+    repair_p = sub.add_parser(
+        "repair-targets",
+        help="List folders whose map fails check (fabrication/dangling edge) — for the orchestrator repair loop",
+    )
+    repair_p.add_argument("root", type=Path)
+    repair_p.add_argument("--json", action="store_true")
+
     cache_p = sub.add_parser("cache-check", help="Flag volatile content in the always-loaded pointer block")
     cache_p.add_argument("root", type=Path)
 
@@ -563,6 +613,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         result = check_maps_fabrication(args.root)
         _print_fabrication(result)
         return 0 if result.ok else 1
+
+    if args.mode == "repair-targets":
+        targets = repair_targets(args.root)
+        if args.json:
+            print(json.dumps(targets, indent=2))
+        else:
+            for target in targets:
+                print(target)
+        return 0
 
     if args.mode == "cache-check":
         findings = check_cache_stability(args.root)
