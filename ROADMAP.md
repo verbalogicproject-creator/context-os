@@ -40,11 +40,14 @@ that spend went to folders a session never reads. `plan.py` ranks folders from t
 DEEP / SKELETON / FOLD; `/context-os` now enriches only DEEP (~40 of ARIA's 77) and folds content
 folders into parents (77 → 58 maps). Deterministic, no LLM.
 
-**Next big lever — lazy / on-demand generation.** Even mapping ~40 strategic folders upfront pays for
-folders a given session never opens. The PreToolUse hook already fires on first Read/Grep of a folder;
-have it generate that folder's map *on first touch* (deterministic skeleton instantly, enrich in the
-background), so generation cost tracks actual use — the natural conclusion of "measure delivered."
-Guard it behind an opt-in; keep the eager `/context-os` for a full pre-map.
+**v0.5.0 — lazy / on-demand enrichment.** Even mapping ~40 strategic folders upfront pays for folders
+a session never opens. The key realization: skeleton generation is cheap ($0, deterministic) — it's
+*enrichment* that costs, and a PreToolUse hook can't run an LLM enricher. So lazy = map the whole repo
+as free skeletons (`/context-os --skeleton`), let the read ledger record touched folders, then
+`/context-os-catchup` enriches only the touched-and-still-skeleton folders (`measure.py catchup` +
+`audit.py map_is_enriched`). Enrichment cost tracks real use; the eager `/context-os` stays for a full
+pre-map. Follow-on: have the drift hook itself emit a one-folder skeleton the instant an *unmapped*
+folder is touched (so even the skeleton pass becomes incremental).
 
 Still open from the same review (scoped, not yet built):
 - **Orchestrator repair loop.** Because default-Haiku output isn't ship-clean on the first pass

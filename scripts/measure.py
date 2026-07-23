@@ -149,6 +149,32 @@ def summarize_transcript(root: Path, transcript: Path) -> dict:
     }
 
 
+def catchup_targets(root: Path, session_id: str) -> List[str]:
+    """Folders touched this session whose map is still skeleton-only (unenriched).
+
+    The lazy flow: `/context-os --skeleton` maps every folder cheaply; the ledger records which
+    folders the session actually touched; `/context-os-catchup` enriches exactly those of them
+    that are still skeletons — so enrichment cost tracks real use, not the whole repo.
+    """
+    import audit  # local: only the catch-up path needs the enrichment check
+
+    owners = set()
+    for entry in session_log.reads(root, session_id):
+        kind = entry.get("kind")
+        if kind in (session_log.KIND_SOURCE_MAPPED, session_log.KIND_EXPLORE) and entry.get("owner"):
+            owners.add(entry["owner"])
+        elif kind == session_log.KIND_MAP and entry.get("path"):
+            owners.add(entry["path"])
+
+    targets = []
+    for owner_rel in owners:
+        map_path = root / owner_rel
+        if map_path.is_file() and not audit.map_is_enriched(map_path):
+            folder = Path(owner_rel).parent.as_posix()
+            targets.append("." if folder in ("", ".") else folder)
+    return sorted(set(targets))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Measure delivered map use per session.")
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -157,6 +183,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     sess.add_argument("root", type=Path)
     sess.add_argument("--session", default=None, help="session id (default: most recent ledger)")
     sess.add_argument("--json", action="store_true")
+
+    cu = sub.add_parser("catchup", help="Folders touched this session whose map is still skeleton-only")
+    cu.add_argument("root", type=Path)
+    cu.add_argument("--session", default=None, help="session id (default: most recent ledger)")
+    cu.add_argument("--json", action="store_true")
 
     tr = sub.add_parser("transcript", help="Best-effort: count reads in a Claude Code .jsonl transcript")
     tr.add_argument("root", type=Path)
@@ -173,6 +204,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 1
         summary = summarize(args.root, session_id)
         print(json.dumps(summary, indent=2) if args.json else format_report(summary))
+        return 0
+
+    if args.mode == "catchup":
+        session_id = args.session or session_log.latest_session_id(args.root)
+        if not session_id:
+            print("no session ledger yet — nothing touched to catch up on", file=sys.stderr)
+            return 0
+        targets = catchup_targets(args.root, session_id)
+        print(json.dumps(targets, indent=2) if args.json else "\n".join(targets))
         return 0
 
     result = summarize_transcript(args.root, args.transcript)

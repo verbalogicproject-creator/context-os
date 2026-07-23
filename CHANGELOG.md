@@ -5,6 +5,23 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-23
+
+Lazy / on-demand mapping. Even mapping only the strategic folders pays for folders a given session
+never opens. Now you can map the whole repo as free skeletons once, then enrich only what you touch.
+
+### Added
+- **`/context-os-catchup` — enrich only the folders you actually worked in.** Reads the per-session
+  read ledger the drift hook already keeps, finds the touched folders whose map is still a bare
+  skeleton, and enriches exactly those (same batched enrich + repair loop as `/context-os`). Re-run
+  it any time; it never re-does an already-enriched folder. So enrichment cost tracks real use —
+  pay for the ~handful you touched, not the hundreds you didn't.
+- **`measure.py catchup <root>`** — lists the touched-but-skeleton folders (the catch-up set).
+- **`audit.py map_is_enriched()`** — tells a bare skeleton (node description IS the file path) from
+  an enriched map, so catch-up knows what still needs work.
+
+The lazy flow: `/context-os --skeleton` (whole repo, `$0`, instant) → work → `/context-os-catchup`.
+
 ## [0.4.0] — 2026-07-23
 
 Map what matters. Instead of blindly enriching every folder, `/context-os` now ranks folders and

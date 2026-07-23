@@ -2,6 +2,7 @@
 
 import json
 
+import audit
 import ctx_staleness
 import measure
 import scan
@@ -78,6 +79,31 @@ def test_corrupt_ledger_line_is_skipped(tmp_path):
     ledger = session_log.ledger_path(tmp_path, "s5")
     ledger.write_text(ledger.read_text() + "{ not json\n")  # a torn append
     assert len(session_log.reads(tmp_path, "s5")) == 1  # the good line survives
+
+
+def test_map_is_enriched_detects_skeleton_vs_enriched(tmp_path):
+    map_path = _mapped_repo(tmp_path)
+    assert audit.map_is_enriched(map_path) is False           # skeleton: node desc IS the path
+    map_path.write_text(map_path.read_text().replace("pkg/m.py", "does the thing"))
+    assert audit.map_is_enriched(map_path) is True            # now a real description
+
+
+def test_catchup_targets_lists_touched_skeleton_folders(tmp_path):
+    _mapped_repo(tmp_path)
+    session_log.record_read(tmp_path, "cu1", "Read", tmp_path / "pkg" / "m.py")  # touch a skeleton folder
+    assert measure.catchup_targets(tmp_path, "cu1") == ["pkg"]
+    # once pkg's map is enriched, it's no longer a catch-up target
+    map_path = tmp_path / "pkg" / "map-pkg.ngf.md"
+    map_path.write_text(map_path.read_text().replace("pkg/m.py", "does the thing"))
+    assert measure.catchup_targets(tmp_path, "cu1") == []
+
+
+def test_catchup_ignores_untouched_folders(tmp_path):
+    _mapped_repo(tmp_path)                        # pkg exists + skeleton, but never touched
+    session_log.record_read(tmp_path, "cu2", "Read", tmp_path / "pkg" / "map-pkg.ngf.md")  # read the MAP only
+    # reading the map (not source) still counts pkg as touched, and it's skeleton → a target
+    assert measure.catchup_targets(tmp_path, "cu2") == ["pkg"]
+    assert measure.catchup_targets(tmp_path, "never-a-session") == []  # no ledger → nothing
 
 
 def test_transcript_best_effort_counts_a_source_read(tmp_path):

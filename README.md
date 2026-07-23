@@ -71,6 +71,21 @@ same in all three — only the prose enrichment differs):
 Start with `--skeleton` for a free structural map; upgrade to full enrichment when you want
 the prose and risk cards.
 
+By default `/context-os` is **strategic** — it ranks folders and enriches only the ones that
+carry architecture (code hubs, entry points), keeps a cheap skeleton for the rest, and folds
+pure docs/data folders into their parent. Pass `--all` to enrich every folder.
+
+**Or go lazy.** Map the whole repo as free skeletons once, then let enrichment follow your
+work: `/context-os-catchup` enriches only the folders you actually touched this session (it reads
+the same per-session ledger the drift hook keeps). Run it whenever; it never re-does a folder
+that's already enriched. So you pay for the handful of folders you worked in, not the whole repo.
+
+```
+/context-os --skeleton      # once: whole repo as skeletons, $0, instant
+… work in the repo …        # the hook logs which folders you touch
+/context-os-catchup         # enrich just those folders, on demand
+```
+
 ## The four commands
 
 | Command | What it does |

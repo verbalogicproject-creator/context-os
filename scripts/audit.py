@@ -484,6 +484,28 @@ def compute_maps_token_report(root: Path) -> TokenReport:
 
 
 # ---------------------------------------------------------------------------
+# Enrichment status — is a map still a bare skeleton, or has it been enriched?
+# ---------------------------------------------------------------------------
+
+# A skeleton code node's description IS its path (`name : src/foo/bar.py [type]`); an enriched
+# node has a real sentence. A bare path/filename (no spaces) is the placeholder tell.
+_PLACEHOLDER_DESC_RE = re.compile(r"^[\w./\-]+\.\w+$")
+
+
+def map_is_enriched(map_path: Path) -> bool:
+    """True if a folder's map carries real descriptions, not the scanner's path placeholders.
+
+    Used by the lazy (catch-up) flow to tell which touched folders still need enrichment.
+    A map with any raw-path node description is treated as skeleton-only (unenriched).
+    """
+    try:
+        nodes, _edges, _warnings = parse_ctx_file(map_path)
+    except OSError:
+        return True  # unreadable → don't flag it for re-enrich
+    return not any(_PLACEHOLDER_DESC_RE.match(node.description.strip()) for node in nodes)
+
+
+# ---------------------------------------------------------------------------
 # Cache-stability hygiene — the in-domain CacheAligner: keep the always-loaded
 # pointer block free of volatile content that would bust provider prompt caches.
 # ---------------------------------------------------------------------------

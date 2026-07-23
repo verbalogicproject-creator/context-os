@@ -6,10 +6,12 @@ example of its output, see `demo/`, which carries real, committed maps.)
 ## Layout
 
 - `.claude-plugin/plugin.json` — plugin manifest (metadata only; dirs auto-discovered).
-- `commands/*.md` — the four slash commands (`/context-os`, `/context-os-update`,
-  `/context-os-status`, `/snapshot`). `/context-os` is the **orchestrator**: it runs the
-  deterministic scan, then (for the enriched tiers) fans out one `map-enricher` per folder in
-  parallel; `--skeleton` skips enrichment entirely, `--premium` runs the enrichers on Sonnet.
+- `commands/*.md` — the five slash commands (`/context-os`, `/context-os-catchup`,
+  `/context-os-update`, `/context-os-status`, `/snapshot`). `/context-os` is the **orchestrator**:
+  scan → `plan.py` ranks folders → fan out one `map-enricher` per **DEEP** folder in parallel →
+  repair loop → fold content into parents; `--skeleton` skips enrichment, `--premium` runs Sonnet,
+  `--all` enriches every folder. `/context-os-catchup` is the **lazy** path: after a `--skeleton`
+  pass, it enriches only the folders the session's read ledger shows you touched.
 - `agents/*.md` — `map-enricher` (enriches ONE folder's map, `model: haiku`) and `map-updater`
   (drift-only refresh, `model: sonnet`). (The old monolithic `map-scout` was retired in v0.2 —
   its work is split between the command orchestrator and the per-folder `map-enricher`.)
