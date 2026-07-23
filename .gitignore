@@ -28,3 +28,6 @@ reference/
 
 # Vouch session ledger (local, not shipped)
 .vouch/
+
+# context-os per-session read ledger (local telemetry, not shipped)
+.context-os/reads-*.jsonl

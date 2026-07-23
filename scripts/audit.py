@@ -192,6 +192,10 @@ class FabricationAuditResult:
     exempt_external: int
     findings: List[FabricationFinding] = field(default_factory=list)
     format_error: Optional[str] = None
+    # Advisory only — an edge whose target names no node in any map. Does NOT fail the
+    # audit (the gate is node-fabrication); it flags a possibly-wrong edge for review,
+    # since `check` proves node *existence*, not edge *direction* (see ROADMAP).
+    edge_warnings: List[str] = field(default_factory=list)
 
 
 def check_derive_dont_fabricate(root: Path, ctx_path: Path) -> FabricationAuditResult:
@@ -360,9 +364,12 @@ def check_maps_fabrication(root: Path) -> FabricationAuditResult:
     findings: List[FabricationFinding] = []
     exempt = 0
     total = 0
+    all_node_names: set = set()
+    all_edges: List[Tuple[str, CtxEdge]] = []
     for map_path in find_map_files(root):
-        nodes, _edges, _warnings = parse_ctx_file(map_path)
+        nodes, edges, _warnings = parse_ctx_file(map_path)
         for node in nodes:
+            all_node_names.add(node.name)
             total += 1
             if node.type == "ext":
                 exempt += 1
@@ -378,12 +385,29 @@ def check_maps_fabrication(root: Path) -> FabricationAuditResult:
                     reason=f"in {map_path.name}: no matching file in the fresh scan",
                 )
             )
+        all_edges.extend((map_path.name, edge) for edge in edges)
+
+    # Advisory: an edge whose target names no node anywhere in the map set is likely a
+    # wrong or dangling edge (a stem collision the scanner resolved to nothing, or a
+    # hand-edit). Not a fabrication (nodes are all real), so it warns but never fails.
+    edge_warnings: List[str] = []
+    for map_name, edge in all_edges:
+        # A `.ngf.md` target is an index→map navigation link (by design), not a node ref.
+        if edge.target.endswith(".ngf.md"):
+            continue
+        if edge.target not in all_node_names:
+            edge_warnings.append(
+                f"in {map_name}: {edge.source} {edge.op} {edge.target} — "
+                f"target '{edge.target}' is not a node in any map"
+            )
+
     return FabricationAuditResult(
         ok=not findings,
         total_nodes=total,
         exempt_external=exempt,
         findings=findings,
         format_error=None,
+        edge_warnings=edge_warnings,
     )
 
 
@@ -487,8 +511,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     cache_p = sub.add_parser("cache-check", help="Flag volatile content in the always-loaded pointer block")
     cache_p.add_argument("root", type=Path)
 
-    savings_p = sub.add_parser("savings", help="Print the token-save number for the whole map set")
+    savings_p = sub.add_parser("savings", help="Print the CEILING token-save (artifact size) for the whole map set")
     savings_p.add_argument("root", type=Path)
+
+    sess_p = sub.add_parser(
+        "session-savings", help="Print the DELIVERED map use for a session (behavioral, from the ledger)"
+    )
+    sess_p.add_argument("root", type=Path)
+    sess_p.add_argument("--session", default=None, help="session id (default: most recent ledger)")
+    sess_p.add_argument("--json", action="store_true")
 
     allp = sub.add_parser("all", help="Run fabrication + tokens, and splice-safety if --before/--after given")
     allp.add_argument("root", type=Path)
@@ -549,6 +580,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print_maps_tokens(report, args.root)
         return 0
 
+    if args.mode == "session-savings":
+        import measure  # local: keeps audit.py importable without the ledger machinery
+
+        session_id = args.session or measure.session_log.latest_session_id(args.root)
+        if not session_id:
+            print("no session ledger yet under .context-os/ — nothing delivered to measure",
+                  file=sys.stderr)
+            return 1
+        summary = measure.summarize(args.root, session_id)
+        print(json.dumps(summary, indent=2) if args.json else measure.format_report(summary))
+        return 0
+
     # all
     fab_result = check_derive_dont_fabricate(args.root, args.ctx)
     _print_fabrication(fab_result)
@@ -574,27 +617,36 @@ def _print_fabrication(result: FabricationAuditResult) -> None:
             f"PASS: derive-don't-fabricate — {result.total_nodes} node(s) checked "
             f"({result.exempt_external} external-exempt), 0 unbacked"
         )
-        return
-    print(f"FAIL: derive-don't-fabricate — {len(result.findings)} unbacked node(s):", file=sys.stderr)
-    for finding in result.findings:
-        print(f"  - {finding.node_name} [{finding.node_type}]: {finding.reason}", file=sys.stderr)
+    else:
+        print(f"FAIL: derive-don't-fabricate — {len(result.findings)} unbacked node(s):", file=sys.stderr)
+        for finding in result.findings:
+            print(f"  - {finding.node_name} [{finding.node_type}]: {finding.reason}", file=sys.stderr)
+    if result.edge_warnings:
+        print(
+            f"NOTE: {len(result.edge_warnings)} edge(s) point to a target not found in any map "
+            "(advisory — node existence is gated, edge direction is not):",
+            file=sys.stderr,
+        )
+        for warning in result.edge_warnings:
+            print(f"  - {warning}", file=sys.stderr)
 
 
 def _print_tokens(report: TokenReport, root: Path, ctx_path: Path) -> None:
     print(
-        f"{report.files_scanned} source files (~{report.source_tokens_est} tokens to scan) under {root} -> "
-        f"{ctx_path.name} is ~{report.ctx_tokens_est} tokens "
-        f"({report.reduction_pct}% smaller; Claude now loads {report.ctx_tokens_est} on demand "
-        f"instead of re-scanning {report.source_tokens_est})."
+        f"CEILING: {ctx_path.name} is ~{report.ctx_tokens_est} tokens vs ~{report.source_tokens_est} "
+        f"to scan {report.files_scanned} source files cold ({report.reduction_pct}% smaller). "
+        f"That is the most a session could save by reading the map instead of the source — a ceiling, "
+        f"not a delivered number. (~4 chars/token estimate.)"
     )
 
 
 def _print_maps_tokens(report: TokenReport, root: Path) -> None:
     print(
-        f"{report.files_scanned} source files (~{report.source_tokens_est} tokens to scan) under {root} -> "
-        f"the context-os map set is ~{report.ctx_tokens_est} tokens "
-        f"({report.reduction_pct}% smaller; a fresh session loads {report.ctx_tokens_est} on demand "
-        f"instead of re-scanning {report.source_tokens_est})."
+        f"CEILING: the context-os map set is ~{report.ctx_tokens_est} tokens vs ~{report.source_tokens_est} "
+        f"to scan {report.files_scanned} source files cold ({report.reduction_pct}% smaller). "
+        f"This is the MOST a session could save, not what it did — realized only when the agent reads a "
+        f"map instead of re-reading its source. Measure the delivered number with "
+        f"`python3 measure.py session {root}`. (~4 chars/token estimate.)"
     )
 
 

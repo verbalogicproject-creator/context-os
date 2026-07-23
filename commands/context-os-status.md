@@ -24,11 +24,19 @@ $ARGUMENTS
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/ctx_staleness.py" status "<project_root>"
    ```
-3. **Report the token-save and grounding**:
+3. **Report the CEILING (artifact size) and grounding**:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" savings "<project_root>"
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" check "<project_root>"
    ```
-4. **Summarize** honestly: total maps, how many are `DRIFTED` (and which folders), the
-   savings line, and whether `check` passed. If anything is `DRIFTED`, point to
-   `/context-os-update`. Never report "all current" unless `status` actually said so.
+4. **Report the DELIVERED number for this session** (behavioral — what the agent actually
+   did, from the read ledger; prints a friendly message if nothing's been logged yet):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" session-savings "<project_root>"
+   ```
+5. **Summarize** honestly, keeping the two numbers distinct: total maps and how many are
+   `DRIFTED` (and which folders); the **ceiling** (how much smaller the maps are than
+   source) as an upper bound, *not* a delivered figure; the **delivered** map-consultation
+   rate for this session if any reads were logged; and whether `check` passed. If anything
+   is `DRIFTED`, point to `/context-os-update`. Never present the ceiling as tokens actually
+   saved, and never report "all current" unless `status` actually said so.

@@ -19,11 +19,18 @@ example of its output, see `demo/`, which carries real, committed maps.)
   - `scan.py` — deterministic scanner + the per-folder `.ngf.md` emit (`--emit-ngf`).
   - `claudemd_splice.py` — the ONLY code path allowed to write the CLAUDE.md/AGENTS.md
     marked block.
-  - `audit.py` — the `.ngf.md`-aware `.ctx` parser + `check` (derive-don't-fabricate) +
-    `savings` (token report).
-  - `ctx_staleness.py` — the structural-hash engine (`signature`/`stamp`/`flip`/`status`).
+  - `audit.py` — the `.ngf.md`-aware `.ctx` parser + `check` (derive-don't-fabricate, + an
+    advisory dangling-edge pass) + `savings` (the CEILING) + `session-savings` (DELIVERED).
+  - `ctx_staleness.py` — the structural-hash engine (`signature`/`stamp`/`flip`/`status`);
+    map writes are atomic and malformed frontmatter fails loudly.
+  - `session_log.py` — the per-session read ledger (`.context-os/reads-<session>.jsonl`):
+    classifies each Read/Grep/Glob as map / source-in-mapped-folder / explore. The behavioral
+    ground truth for "did the agent read the map?".
+  - `measure.py` — turns that ledger into the DELIVERED number (map-consultation rate); a
+    best-effort `transcript` mode reads Claude Code's own session `.jsonl`.
   - `snapshot.py` — the mechanical scaffolder for `/snapshot`.
-  - `retrieve.py` — CCR: resolve a `path[:symbol]` anchor to the exact original block + hash.
+  - `retrieve.py` — CCR: resolve a `path[:symbol]` anchor to the exact original block + hash
+    (ast-exact for Python; literal-aware best-effort elsewhere, with a `low_confidence` flag).
   - `compress.py` — content-aware compressed views for non-code files (config/doc/data/log).
   - `mcp_server.py` — stdlib stdio MCP server (`contextos_map` + `contextos_retrieve`), wired by `.mcp.json`.
 - `demo/` — a two-service app with its own committed maps, used by the README and CI.
@@ -46,7 +53,17 @@ plugin and **vendored** here so context-os is self-contained (see `NOTICE`).
    block, with a `.bak` first, and it REFUSES on malformed markers. Keep the four
    refusal/idempotency/byte-identity tests in `test_splice.py` green.
 5. **The pointer block must keep the "Do NOT fan out exploration agents" line** — that
-   sentence is the whole token-saving intervention (`test_splice.py` asserts it).
+   sentence is the token-saving *intervention* (`test_splice.py` asserts it). Its *effect* is
+   not assumed: the PreToolUse hook + `session_log.py` measure whether the agent actually
+   read the map, and `measure.py`/`session-savings` report the delivered rate.
+6. **Ceiling ≠ delivered — never conflate them.** `audit.py savings` is an artifact-size
+   *ceiling* (the most a session could save); the delivered number comes only from the
+   session ledger. Public copy must not present the ceiling as tokens actually saved. The
+   `check` gate proves node *existence* only — not description accuracy or edge direction
+   (say "never invents a node", never an unqualified "never invents").
+7. **Hooks never block and never break a tool call.** The drift/telemetry/nudge hooks emit
+   `systemMessage` at most (no permission decision) and swallow every exception. The ledger
+   is local, gitignored (`.context-os/reads-*.jsonl`), and `other`-kind reads aren't logged.
 
 Run the full check before considering a change done:
 ```bash

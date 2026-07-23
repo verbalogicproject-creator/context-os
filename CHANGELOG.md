@@ -5,6 +5,47 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-23
+
+"Measure, don't claim." A Scientifix-Council review found the savings machinery measured the
+**artifact** (map size vs source size), never the **behavior** (did the agent read the map?),
+and turned up two silent correctness bugs. This release closes the claim-vs-delivery gap and
+fixes the bugs — same discipline mcp-triage already applies to its own payoff.
+
+### Added
+- **Per-session delivery measurement (`scripts/session_log.py` + `scripts/measure.py`).** A hook
+  logs, per session, whether the agent read a **map**, re-read **source in a mapped folder**, or
+  **grep/glob-explored** a mapped folder — to `.context-os/reads-<session>.jsonl`. `measure.py
+  session <root>` (and `audit.py session-savings`, and `/context-os-status`) report the delivered
+  map-consultation rate: what the agent actually did, not an artifact-size hypothetical. The
+  ledger pattern is the one `vouch` proved live. A best-effort `measure.py transcript` reads
+  Claude Code's own session `.jsonl` too. Tests in `test_measure.py`.
+- **Gentle, non-blocking nudge.** When a session reaches for source (or fans out) in a folder
+  whose map it hasn't read, the PreToolUse hook emits a one-line `systemMessage` pointing at the
+  map — once per folder, never a permission block. Hook matcher widened to `Read|Grep|Glob`.
+- **Edge advisory in `audit.py check`.** Flags an edge whose target names no node in any map
+  (advisory only — never fails the node-fabrication gate; skips index→map navigation links).
+- **CI band on the headline (`test_savings_band.py`).** Pins the committed demo's ceiling into a
+  band so a scan/format change can't silently tank or inflate the compression number unnoticed.
+
+### Fixed
+- **`retrieve.py` silent span truncation.** Python symbols now use the stdlib `ast` (exact spans,
+  incl. decorators and multi-line signatures/assignments); brace/indent languages get literal-aware,
+  multi-line-signature-aware matching. A suspect span is flagged `low_confidence` instead of
+  returning a confident hash over truncated text. Regression tests for Black/Prettier wrapping,
+  decorators, object-literal defaults, and string-embedded braces.
+- **`ctx_staleness.py` silent-corruption paths.** Map writes are now atomic (tempfile + `os.replace`),
+  so an OOM/Phantom-Process-Killer kill mid-write can't corrupt a map's `---` delimiters; malformed
+  frontmatter now fails loudly (`stamp` raises, `flip` returns an `unreadable` status, `stamp-all`
+  reports failures) instead of silently no-op'ing; a leading BOM is tolerated.
+
+### Changed
+- **Copy: ceiling vs delivered, kept separate.** `audit.py savings` and the README now label the
+  90%+ figure a **ceiling** (artifact size — the most a session *could* save) and point to the
+  delivered measurement. "Never invents" is qualified to "never invents a **node**" (existence is
+  gated; description accuracy and edge direction are not). mcp-triage drops the unsourced
+  "~120 tokens/5 servers" figure and points users to `/context` to measure their own.
+
 ## [0.3.0] — 2026-07-22
 
 [Headroom](https://github.com/chopratejas/headroom)'s token-saving ideas, adopted **in-domain**

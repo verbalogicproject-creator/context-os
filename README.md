@@ -14,17 +14,27 @@ The maps are plain Markdown with a YAML header, so **Claude, Codex, and Gemini a
 them the same way, cold.** And they keep themselves honest: when a folder's code changes,
 its map flips to `DRIFTED` so a stale map *warns you* instead of quietly lying.
 
-This isn't a pitch — it's a measurement. Every run prints the number, computed against
-*your* source:
+This isn't a pitch — it's two measurements, and we keep them honest by keeping them
+separate. First, the **ceiling**: how much smaller the maps are than your source, computed
+against *your* files on every run:
 
 ```
-188 source files (~46,000 tokens to scan) under . -> the context-os map set is
-~3,200 tokens (93% smaller; a fresh session loads 3,200 on demand instead of
-re-scanning 46,000).
+188 source files (~46,000 tokens to scan) under . -> CEILING: the context-os map set is
+~3,200 tokens vs ~46,000 to scan the source cold (93% smaller). This is the MOST a
+session could save, not what it did — realized only when the agent reads a map instead
+of re-reading its source.
 ```
 
-Generating the maps costs about one cold exploration, once. Every session after reads
-the map instead. Break-even is the first session.
+That 93% is an *artifact-size* number — a real, reproducible upper bound. It becomes real
+tokens only when a session actually reads the map instead of exploring. So context-os also
+measures what a session **delivered**: a hook logs, per session, when the agent read a map
+versus re-read (or grepped) the source it already maps, and `python3 measure.py session .`
+(or `/context-os-status`) reports the delivered number and the map-consultation rate. Ceiling
+tells you the opportunity; delivered tells you whether it landed. We won't sell you the
+ceiling as if it were the delivered number.
+
+Generating the maps costs about one cold exploration, once. Every session after *can* read
+the map instead — and now you can measure whether it did.
 
 ## Quickstart
 
@@ -108,9 +118,12 @@ continues from where you stopped — no prior coordination.
 
 ## What it never does
 
-- **Never invents.** Every node in a map traces to a real file the scanner found; every
-  description is written from a file that was actually read. A built-in `check` audit
-  fails the run if anything is fabricated.
+- **Never invents a node.** Every node in a map traces to a real file the scanner found;
+  the built-in `check` audit fails the run if a node doesn't. (Honest scope: `check`
+  gates node *existence* mechanically. Descriptions are written from files actually read,
+  and edges come from the deterministic scanner — but `check` does not prove a description
+  is accurate or an edge points the right way; it flags an edge to a missing target as an
+  advisory. A `DRIFTED` flag then tells you when even a correct map has gone out of date.)
 - **Never clobbers your CLAUDE.md.** It only ever touches its own marked block, backs up
   before writing, and refuses (rather than guesses) if you've hand-edited the markers.
 - **Never phones home.** Free, offline, `$0`, no server, no API keys — a standard-library

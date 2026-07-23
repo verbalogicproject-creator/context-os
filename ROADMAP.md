@@ -15,9 +15,33 @@ enrichers read signatures not whole files. Next levers below:
 retrieval (`retrieve.py` — the map is the compressed view, the source the retrievable original,
 by `path:symbol` anchor + hash), an MCP server exposing map + retrieve so context-os stacks under
 any runtime compressor, content-aware maps for config/docs/data/log folders (`compress.py`), and
-cache-stability hygiene (`audit.py cache-check`). Next: verify the MCP server against a live
-Claude Code session; broaden symbol-span + content-type coverage; store a per-node build-time hash
-for verifiable CCR when a project opts in.
+cache-stability hygiene (`audit.py cache-check`).
+
+**v0.3.1 closed the claim-vs-delivery gap** (Scientifix-Council review): per-session behavioral
+measurement (`session_log.py` + `measure.py` + `audit.py session-savings`) so the savings number
+is the delivered map-consultation rate, not an artifact-size ceiling; a non-blocking map nudge;
+ast-exact + literal-aware symbol spans with a `low_confidence` flag; atomic map writes + a
+malformed-frontmatter guard; an edge advisory in `check`; and a CI band pinning the headline.
+
+Still open from the same review (scoped, not yet built):
+- **Run the shipped fan-out at scale, for real.** Every dogfood number so far came from a manually
+  steered `general-purpose` subagent (or the retired `map-scout`); the `context-os:map-enricher`
+  parallel-batch orchestration in `commands/context-os.md` has never been dispatched end-to-end.
+  Run `/context-os` on a 20+ folder repo, capture the transcript, confirm the batching + the
+  continue-on-enricher-failure path, and record wall-clock/token-per-shard.
+- **Confirm the Haiku-on-digest quality bar against Sonnet** on a few real repos; tune the digest
+  (more languages, better doc extraction) and the batch size. Until measured, consider defaulting
+  to `--skeleton` (honestly free, zero fabrication risk).
+- **Edge direction, not just existence.** `check`'s edge pass is advisory (dangling targets only).
+  Tag ambiguous import resolutions in `scan.py` (the `_match_by_suffix` "other" branch, where a
+  stem collision is resolved by iteration order) so a low-confidence edge is visible, not silent.
+- **Verify the MCP server against a live Claude Code session** (`test_mcp.py` proves the protocol,
+  not a real client); broaden symbol-span + content-type coverage; store a per-node build-time hash
+  for verifiable CCR when a project opts in.
+- **Quadratic import resolution.** `_match_by_suffix` is O(imports × files); pre-index `all_files`
+  by stem for the "hundreds of thousands of tokens" monorepo case the README targets.
+- **True per-session tokens.** `measure.py transcript` counts reads best-effort; wire it to sum the
+  real `usage` deltas Claude Code already writes per turn, so delivered savings are in real tokens.
 
 The items below are researched, scoped, and not yet built.
 

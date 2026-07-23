@@ -34,8 +34,35 @@ import hashlib
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Optional
+
+
+class MalformedFrontmatterError(ValueError):
+    """A map file has no readable YAML frontmatter block, so it cannot be stamped."""
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` atomically: temp file in the same dir, then os.replace.
+
+    A plain write_text() that is killed mid-flush (OOM under swap pressure, or Android's
+    Phantom Process Killer) can leave a half-written map — including corrupted `---`
+    delimiters that would silently disable that map's drift detection forever. os.replace
+    is atomic on POSIX, so a reader ever only sees the old file or the whole new one.
+    """
+    directory = path.parent
+    fd, tmp = tempfile.mkstemp(dir=str(directory), prefix=".ctxtmp-", suffix=".ngf.md")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 SRC_EXT = frozenset(
     {
@@ -90,8 +117,12 @@ def signature(folder: Path) -> str:
 
 
 def _frontmatter_close(lines: List[str]) -> Optional[int]:
-    """Index of the closing `---` of a leading YAML frontmatter block, or None."""
-    if not lines or lines[0].strip() != "---":
+    """Index of the closing `---` of a leading YAML frontmatter block, or None.
+
+    Tolerates a UTF-8 BOM on the first line (a hand-edit or a Windows editor can leave one),
+    which would otherwise make the `---` compare fail and silently disable drift tracking.
+    """
+    if not lines or lines[0].lstrip("﻿").strip() != "---":
         return None
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
@@ -175,20 +206,34 @@ def owning_map(root: Path, path: Path) -> Optional[Path]:
 # ---------------------------------------------------------------------------
 
 
+STATUS_UNREADABLE = "unreadable — map frontmatter is malformed; regenerate this map"
+
+
 def stamp(map_path: Path) -> None:
-    """Write the folder's current signature as the baseline + `staleness: verified`."""
+    """Write the folder's current signature as the baseline + `staleness: verified`.
+
+    Raises MalformedFrontmatterError if the map has no readable frontmatter — writing the
+    baseline would silently no-op otherwise (fm_set returns text unchanged), leaving the
+    map permanently un-tracked while `stamp` reported success.
+    """
     text = map_path.read_text()
+    if _frontmatter_close(text.splitlines()) is None:
+        raise MalformedFrontmatterError(f"{map_path}: no readable YAML frontmatter block")
     text = fm_set(text, "structural_hash", signature(map_path.parent))
     text = fm_set(text, "staleness", "verified")
-    map_path.write_text(text)
+    _atomic_write(map_path, text)
 
 
 def flip(map_path: Path) -> str:
     """Recompute the folder signature vs the stored baseline and set the staleness flag.
 
-    Returns the new status string. Writes only if the flag actually changed.
+    Returns the new status string. Writes only if the flag actually changed. If the map's
+    frontmatter is unreadable, returns STATUS_UNREADABLE loudly instead of silently
+    failing to persist a flag it can't write.
     """
     text = map_path.read_text()
+    if _frontmatter_close(text.splitlines()) is None:
+        return STATUS_UNREADABLE
     baseline = fm_get(text, "structural_hash")
     now = signature(map_path.parent)
     if baseline is None:
@@ -199,17 +244,25 @@ def flip(map_path: Path) -> str:
         status = "DRIFTED — folder changed since last verify; trust loosely, run /context-os-update"
     updated = fm_set(text, "staleness", status)
     if updated != text:
-        map_path.write_text(updated)
+        _atomic_write(map_path, updated)
     return status
 
 
-def stamp_all(root: Path) -> int:
-    """Stamp every `map-*.ngf.md` under `root`. Returns the count stamped."""
+def stamp_all(root: Path) -> tuple:
+    """Stamp every `map-*.ngf.md` under `root`. Returns (stamped_count, [failed_paths]).
+
+    A map with malformed frontmatter is collected as a failure rather than aborting the
+    whole run — one bad map must not stop the rest from being stamped.
+    """
     count = 0
+    failed: List[Path] = []
     for map_path in sorted(root.glob("**/map-*.ngf.md")):
-        stamp(map_path)
-        count += 1
-    return count
+        try:
+            stamp(map_path)
+            count += 1
+        except MalformedFrontmatterError:
+            failed.append(map_path)
+    return count, failed
 
 
 def status_all(root: Path) -> List[tuple]:
@@ -241,13 +294,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if mode == "stamp" and len(args) == 2:
-        stamp(Path(args[1]))
+        try:
+            stamp(Path(args[1]))
+        except MalformedFrontmatterError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
         print(f"stamped {args[1]}")
         return 0
 
     if mode == "stamp-all" and len(args) == 2:
-        n = stamp_all(Path(args[1]))
+        n, failed = stamp_all(Path(args[1]))
         print(f"stamped {n} map(s)")
+        if failed:
+            print(f"WARNING: {len(failed)} map(s) had unreadable frontmatter (not stamped):", file=sys.stderr)
+            for path in failed:
+                print(f"  - {path}", file=sys.stderr)
+            return 1
         return 0
 
     if mode == "flip" and len(args) == 2:

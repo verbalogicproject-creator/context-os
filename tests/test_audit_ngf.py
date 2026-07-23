@@ -54,3 +54,16 @@ def test_savings_report_is_computable(tmp_path):
     report = audit.compute_maps_token_report(tmp_path)
     assert report.files_scanned >= 1
     assert report.ctx_tokens_est >= 1
+
+
+def test_edge_advisory_flags_dangling_target_without_failing(tmp_path):
+    _emit(tmp_path)
+    map_path = tmp_path / "s" / "map-s.ngf.md"
+    map_path.write_text(
+        map_path.read_text().replace(
+            "## Files", "## Files\n  a : local file [component] -> ghosttarget"
+        )
+    )
+    result = audit.check_maps_fabrication(tmp_path)
+    assert result.ok  # advisory only: every node is real, so the fabrication gate still passes
+    assert any("ghosttarget" in w for w in result.edge_warnings)

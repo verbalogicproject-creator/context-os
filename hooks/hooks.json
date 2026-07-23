@@ -1,5 +1,5 @@
 {
-  "description": "context-os: keeps each architecture map's staleness flag honest — flips a map to DRIFTED when a source file in its folder changes (PostToolUse), and re-checks a map just before it is read so out-of-band changes are caught too (PreToolUse). Never blocks a tool call; the warning lives inside the map file.",
+  "description": "context-os: keeps each architecture map's staleness flag honest (flips a map to DRIFTED when a source file in its folder changes), logs map-vs-source use per session so delivered savings can be measured (not guessed), and gently points at a folder's map when the session reaches for source instead. Never blocks a tool call; warnings live inside the map file and in a one-line note.",
   "hooks": {
     "PostToolUse": [
       {
@@ -15,7 +15,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Read",
+        "matcher": "Read|Grep|Glob",
         "hooks": [
           {
             "type": "command",
