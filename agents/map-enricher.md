@@ -49,6 +49,9 @@ content nodes — config/doc/data/log — are pre-described deterministically); 
   for a state/store read, `=>` for an HTTP call, and — for a dependency on **another folder** — an
   `## External` group with a `[ext]` node named for that folder/system, the edge pointing at it,
   plus a `depends_on` entry (see `demo/web/map-web.ngf.md`). Never leave a dangling edge.
+  **An edge target is a NODE NAME (a bare stem that appears as a node), never a description:**
+  write `ChatPanel ~> chat`, NEVER `ChatPanel ~> chat store for message management`. If you can't
+  name the exact target node, don't add the edge — a prose target fails the edge audit.
 - **Entry + noise + MARKER PLACEMENT.** Markers go **after the `[type]` tag**, space-separated:
   `name : description [type] @entry @risk` — NEVER inside the description text. Mark the folder's
   real entry point(s) `@entry`; `collapse` (`... (N) : a, b, c [type]`) low-signal repetitive
@@ -63,7 +66,11 @@ content nodes — config/doc/data/log — are pre-described deterministically); 
 ### 3. Keep names + scope exactly
 
 - **Never rename a node** — keep the scanner's exact names (a bare stem, or `dir/stem` for a
-  repo-wide stem collision) so the whole-map fabrication audit stays valid.
+  repo-wide stem collision) so the whole-map fabrication audit stays valid. When a stem collides
+  across the repo, the scanner disambiguates to a long path-like name (e.g.
+  `src/lib/aria-core/knowledge/config`, not bare `config`). **Keep that full name verbatim — NEVER
+  shorten a disambiguated `dir/stem` name to its bare stem**; that "tidy-up" fabricates a node the
+  audit can't trace, and it's the single most common way this step fails.
 - **Touch only your folder's map.** Do not edit other folders' maps, the `index.ngf.md`, the
   source, or `CLAUDE.md`/`AGENTS.md`. Do not run `stamp`, `splice`, or `audit` — the
   orchestrator does those once, after all enrichers finish.

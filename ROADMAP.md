@@ -23,15 +23,25 @@ is the delivered map-consultation rate, not an artifact-size ceiling; a non-bloc
 ast-exact + literal-aware symbol spans with a `low_confidence` flag; atomic map writes + a
 malformed-frontmatter guard; an edge advisory in `check`; and a CI band pinning the headline.
 
+**Validated end-to-end (2026-07-23, ARIA-Therapeutic — 77 folders, 554 files, Python+TS+React):**
+The parallel Haiku enricher fan-out ran end-to-end for the first time. Deterministic pass: ~5.4s,
+$0, `check` PASS (553 nodes, 0 fabricated), ceiling 98.6% (~1.65M source tokens → ~23K map tokens).
+A 10-folder parallel enricher batch: ~86s wall-clock (vs ~588s serial, ~6.8× from parallelism),
+~26K Haiku tokens/folder, 6/10 folders needed 0 full-file reads (digest sufficient; JSX-component
+folders needed more). First-pass Haiku quality on real messy code: ~1 rename→fabrication + ~5
+prose-in-edge-target errors per 10 folders — **both classes caught** by `audit check` (hard fail)
+and the edge advisory. Fixed at root cause: `map-enricher.md` hardened (keep disambiguated
+`dir/stem` names verbatim; edge target is a node name, never prose) → re-ran the two folders →
+`check` PASS. Conclusion: the orchestration is sound; the audit gate is load-bearing for the
+default Haiku tier.
+
 Still open from the same review (scoped, not yet built):
-- **Run the shipped fan-out at scale, for real.** Every dogfood number so far came from a manually
-  steered `general-purpose` subagent (or the retired `map-scout`); the `context-os:map-enricher`
-  parallel-batch orchestration in `commands/context-os.md` has never been dispatched end-to-end.
-  Run `/context-os` on a 20+ folder repo, capture the transcript, confirm the batching + the
-  continue-on-enricher-failure path, and record wall-clock/token-per-shard.
-- **Confirm the Haiku-on-digest quality bar against Sonnet** on a few real repos; tune the digest
-  (more languages, better doc extraction) and the batch size. Until measured, consider defaulting
-  to `--skeleton` (honestly free, zero fabrication risk).
+- **Orchestrator repair loop.** Because default-Haiku output isn't ship-clean on the first pass
+  (see above), have `/context-os` re-run *only* the folders whose nodes fail `check` (bounded
+  retries), so a stray fabrication/edge slip self-heals instead of leaving the map set failing.
+- **Confirm the Haiku-vs-Sonnet quality delta** now that the Haiku error classes are known and
+  guarded; tune the digest for JSX/React (thin docstrings forced full reads). Consider defaulting
+  correctness-critical runs to `--skeleton` (honestly free, zero fabrication risk) or `--premium`.
 - **Edge direction, not just existence.** `check`'s edge pass is advisory (dangling targets only).
   Tag ambiguous import resolutions in `scan.py` (the `_match_by_suffix` "other" branch, where a
   stem collision is resolved by iteration order) so a low-confidence edge is visible, not silent.
