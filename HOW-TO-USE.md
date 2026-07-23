@@ -133,6 +133,21 @@ The root **`index.ngf.md`** is the same shape, but its "files" are your folders 
 a one-line description and a link to that folder's map. An agent starts there and drills
 into only the map it needs.
 
+### Retrieving the exact original (CCR)
+
+A map is the *compressed* view; each file is the retrievable *original*. When you (or an agent)
+need the exact code behind a node, retrieve it by reference instead of re-reading the folder:
+
+```bash
+python3 scripts/retrieve.py . src/store/cart.ts:addItem
+```
+
+That prints the exact `addItem` block plus a content hash — read the cheap map, pull the full
+original only when needed. context-os also ships a small MCP server (`.mcp.json`) with
+`contextos_map` and `contextos_retrieve`, so any agent — or a runtime compressor like Headroom —
+can read the maps and fetch originals. And config / docs / data / log folders get their own
+compressed map nodes now, so a fresh session sees the whole project, not just the code.
+
 ---
 
 ## 5. The daily workflow — drift

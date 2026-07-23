@@ -23,6 +23,9 @@ example of its output, see `demo/`, which carries real, committed maps.)
     `savings` (token report).
   - `ctx_staleness.py` — the structural-hash engine (`signature`/`stamp`/`flip`/`status`).
   - `snapshot.py` — the mechanical scaffolder for `/snapshot`.
+  - `retrieve.py` — CCR: resolve a `path[:symbol]` anchor to the exact original block + hash.
+  - `compress.py` — content-aware compressed views for non-code files (config/doc/data/log).
+  - `mcp_server.py` — stdlib stdio MCP server (`contextos_map` + `contextos_retrieve`), wired by `.mcp.json`.
 - `demo/` — a two-service app with its own committed maps, used by the README and CI.
 - `tests/` — pytest; `conftest.py` puts `scripts/` on `sys.path` (no packaging step).
 

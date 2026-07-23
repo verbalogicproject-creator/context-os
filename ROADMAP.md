@@ -11,6 +11,14 @@ enrichers read signatures not whole files. Next levers below:
 - **Wire the digest deeper + measure.** Confirm the Haiku-on-digest quality bar against Sonnet
   on a few real repos; tune the digest (more languages, better doc extraction) and the batch size.
 
+**v0.3 shipped Headroom's compression ideas in-domain** (stdlib-only, no Headroom dep): CCR
+retrieval (`retrieve.py` — the map is the compressed view, the source the retrievable original,
+by `path:symbol` anchor + hash), an MCP server exposing map + retrieve so context-os stacks under
+any runtime compressor, content-aware maps for config/docs/data/log folders (`compress.py`), and
+cache-stability hygiene (`audit.py cache-check`). Next: verify the MCP server against a live
+Claude Code session; broaden symbol-span + content-type coverage; store a per-node build-time hash
+for verifiable CCR when a project opts in.
+
 The items below are researched, scoped, and not yet built.
 
 ## Git integration (the human + CI loop)

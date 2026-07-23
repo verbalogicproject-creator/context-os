@@ -157,7 +157,32 @@ mechanical scaffolding.
 
 ---
 
-## 5. Validation
+## 5. Retrieval (CCR) and content-aware maps
+
+**Compress-Cache-Retrieve.** A map is the *compressed* view of a folder; each source file is the
+*retrievable original*. A reader consults the cheap map, then retrieves the exact original **only
+when it needs it**, by an **anchor**: a repo-relative `path` (whole file) or `path:symbol` (one
+`def`/`class`/`function`/top-level-constant block). `scripts/retrieve.py` resolves the anchor to
+the exact original text plus a `sha256` (best-effort symbol-span: brace-matched in brace
+languages, indent-matched otherwise, bracket-matched for assignments; falls back to the whole
+file). Maps stay lean — **no per-node hashes**; retrieval computes the block + hash on demand.
+The hash lets a caller cache/verify, and a mismatch against a build-time hash means that exact
+block changed. Exposed over MCP as `contextos_map` + `contextos_retrieve` (`scripts/mcp_server.py`,
+`.mcp.json`) so any agent or runtime compressor can consume it.
+
+**Content-aware nodes.** Non-code files also get a map node, described by a deterministic
+compressed view (`scripts/compress.py`): `[config]` (JSON/YAML keys + shape), `[doc]`
+(title + headings), `[data]` (columns + row count), `[log]` (errors/warnings). These descriptions
+are written at scan time (no enrichment needed); the node still traces to a real file, so the
+fabrication audit holds.
+
+**Cache hygiene.** The always-loaded CLAUDE.md/AGENTS.md pointer block is byte-stable and
+volatile-free (`audit.py cache-check` flags timestamps/UUIDs/hashes/JWTs in it); maps' volatile
+stamps (`last_verified`/`staleness`/`structural_hash`) live in frontmatter, never in the block body.
+
+---
+
+## 6. Validation
 
 A map is **valid** if: frontmatter parses and carries the required `context_map` fields; the
 body is exactly one ` ```ctx ` block; the block header has `format: ctx/1.1` + an `edges:`

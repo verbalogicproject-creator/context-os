@@ -24,11 +24,15 @@ jobs:
         run: |
           cp -r demo /tmp/demo-smoke
           find /tmp/demo-smoke -name '*.ngf.md' -delete
-          python3 scripts/scan.py /tmp/demo-smoke --emit-ngf
+          python3 scripts/scan.py /tmp/demo-smoke --emit-ngf --emit-digests
           python3 scripts/ctx_staleness.py stamp-all /tmp/demo-smoke
+          python3 scripts/claudemd_splice.py claudemd /tmp/demo-smoke/CLAUDE.md
           python3 scripts/audit.py check /tmp/demo-smoke
+          python3 scripts/audit.py cache-check /tmp/demo-smoke
           python3 scripts/ctx_staleness.py status /tmp/demo-smoke
           python3 scripts/audit.py savings /tmp/demo-smoke
+          # CCR round-trip: retrieve a symbol and confirm a hash comes back
+          python3 scripts/retrieve.py /tmp/demo-smoke api/store.py:Store | grep -q "class Store"
 
       - name: Committed demo maps must be current (drift gate)
         run: |

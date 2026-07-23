@@ -93,6 +93,19 @@ pointers), the git state, and each map's hash at capture. Copy the repo + that f
 clean machine, hand a fresh session (Claude, Codex, whatever) the snapshot, and it
 continues from where you stopped — no prior coordination.
 
+## Retrieve originals, feed any agent, map everything (v0.3)
+
+- **Retrieve the exact original (CCR).** A map is the compressed view; the source is the
+  retrievable original. `python3 scripts/retrieve.py . path:symbol` returns the exact
+  `def`/`class` block + a content hash — read the cheap map, pull the full original only when
+  needed.
+- **An MCP server** (`.mcp.json`, stdlib) exposes `contextos_map` + `contextos_retrieve`, so any
+  agent — or a runtime message compressor like [Headroom](https://github.com/chopratejas/headroom)
+  — can consume the maps and fetch originals. context-os compresses *structure ahead of time*; a
+  runtime compressor squeezes *each request*. Different layers — they stack.
+- **Non-code folders too.** config / docs / data / log files get a compressed one-line map node
+  (JSON shape, doc headings, CSV columns, log errors), so a fresh session sees the whole project.
+
 ## What it never does
 
 - **Never invents.** Every node in a map traces to a real file the scanner found; every
@@ -109,7 +122,9 @@ continues from where you stopped — no prior coordination.
 commands/   the four slash commands
 agents/     map-enricher (per-folder, parallel) + map-updater (drift-only refresh)
 hooks/      the drift hooks (hooks.json + handlers)
-scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, snapshot.py (stdlib only)
+scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, snapshot.py,
+            retrieve.py (CCR), compress.py (non-code), mcp_server.py (stdlib only)
+.mcp.json   the MCP server config (contextos_map + contextos_retrieve)
 demo/       a tiny two-service app with real, committed context-os output
 SPEC.md     the format specification (ctx/1.1 + the three kinds)
 ```

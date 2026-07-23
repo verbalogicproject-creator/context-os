@@ -35,6 +35,8 @@ from datetime import date
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
+import compress  # content-aware views for non-code files (config/doc/data/log)
+
 FORMAT_VERSION = "ctx-scan/1.0"
 
 # ---------------------------------------------------------------------------
@@ -182,6 +184,24 @@ def scan_project(root: Path, exclude_dirs: Set[str]) -> Dict[str, List[str]]:
     return dict(folders)
 
 
+def scan_content(root: Path, exclude_dirs: Set[str]) -> Dict[str, List[str]]:
+    """Like `scan_project`, but for non-code CONTENT files (config/doc/data/log).
+
+    Skips dot-directories (`.claude`, `.github`, `.vscode`, …) so tooling config isn't
+    mapped as if it were the project.
+    """
+    folders: Dict[str, List[str]] = defaultdict(list)
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in exclude_dirs and not d.startswith("."))
+        rel_dir = Path(dirpath).relative_to(root).as_posix()
+        if rel_dir == ".":
+            rel_dir = ""
+        for name in sorted(filenames):
+            if Path(name).suffix.lower() in compress.CONTENT_EXTENSIONS:
+                folders[rel_dir].append(name)
+    return dict(folders)
+
+
 def _match_by_suffix(
     needle: str, source_dir: str, all_files: Dict[str, Set[str]]
 ) -> Optional[Tuple[str, str]]:
@@ -271,13 +291,18 @@ def resolve_import(
 
 @dataclass(frozen=True)
 class ScanNode:
-    """One real source file, grounded by its actual path on disk."""
+    """One real file, grounded by its actual path on disk.
+
+    `desc` is empty for code files (the enricher fills it) and a deterministic content-aware
+    view for non-code files (config/doc/data/log), computed at scan time by `compress.py`.
+    """
 
     name: str
     path: str
     dir: str
     ext: str
     type: str
+    desc: str = ""
 
 
 @dataclass(frozen=True)
@@ -407,7 +432,10 @@ class ScanResult:
                 "## Files",
             ]
             for n in sorted(by_dir[d], key=lambda x: x.path):
-                lines.append(f"  {n.name} : {n.path} [{n.type}]")
+                # Content files carry a deterministic compressed description; code files show
+                # the path as a placeholder for the enricher. Bracket-strip to protect [type].
+                desc = (n.desc or n.path).replace("[", "(").replace("]", ")")
+                lines.append(f"  {n.name} : {desc} [{n.type}]")
                 targets = sorted(
                     {
                         t
@@ -581,6 +609,15 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
             stem_counts[stem] += 1
             file_records.append((dir_path, f, stem, Path(f).suffix))
 
+    # Non-code content files (config/doc/data/log): nodes with a deterministic compressed
+    # description, no edges. Counted in stem_counts so naming stays collision-safe repo-wide.
+    content_records: List[Tuple[str, str, str, str]] = []
+    for dir_path, files in scan_content(root, exclude_dirs).items():
+        for f in files:
+            stem = Path(f).stem
+            stem_counts[stem] += 1
+            content_records.append((dir_path, f, stem, Path(f).suffix))
+
     def node_name(dir_path: str, stem: str) -> str:
         if stem_counts[stem] > 1:
             return f"{dir_path}/{stem}" if dir_path else stem
@@ -592,6 +629,13 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
         name = node_name(dir_path, stem)
         ntype = infer_type(f, posixpath.basename(dir_path) if dir_path else "")
         nodes.append(ScanNode(name=name, path=rel_path, dir=dir_path, ext=ext, type=ntype))
+    for dir_path, f, stem, ext in content_records:
+        rel_path = f"{dir_path}/{f}" if dir_path else f
+        full = root / rel_path
+        nodes.append(ScanNode(
+            name=node_name(dir_path, stem), path=rel_path, dir=dir_path, ext=ext,
+            type=compress.content_type(full) or "doc", desc=compress.compress_file(full),
+        ))
     nodes.sort(key=lambda n: n.path)
 
     seen_edges: Set[Tuple[str, str]] = set()
@@ -627,7 +671,7 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
     edges.sort(key=lambda e: (e.source, e.target))
 
     stats = {
-        "files_scanned": len(file_records),
+        "files_scanned": len(file_records) + len(content_records),
         "total_imports": total_imports,
         "resolved_edges": resolved_count,
     }

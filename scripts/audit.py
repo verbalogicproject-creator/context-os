@@ -417,6 +417,45 @@ def compute_maps_token_report(root: Path) -> TokenReport:
 
 
 # ---------------------------------------------------------------------------
+# Cache-stability hygiene — the in-domain CacheAligner: keep the always-loaded
+# pointer block free of volatile content that would bust provider prompt caches.
+# ---------------------------------------------------------------------------
+
+_VOLATILE_PATTERNS = [
+    ("timestamp", re.compile(r"\b\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")),
+    ("uuid", re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")),
+    ("hash", re.compile(r"\b[0-9a-f]{32,}\b")),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.")),
+]
+
+
+def check_cache_stability(root: Path) -> List[Tuple[str, str, str]]:
+    """Return [(file, kind, sample), …] volatile items inside the CLAUDE.md/AGENTS.md pointer block.
+
+    The pointer block sits in the session's cached prefix; volatile content there would reduce
+    provider prompt-cache hits every session. It should be empty (the block is fixed text) —
+    this enforces that. Maps' own volatile stamps live in frontmatter (skippable), not here.
+    """
+    findings: List[Tuple[str, str, str]] = []
+    for fname in ("CLAUDE.md", "AGENTS.md"):
+        path = root / fname
+        if not path.is_file():
+            continue
+        text = path.read_text(errors="ignore")
+        try:
+            span = claudemd_splice._find_markers(text, claudemd_splice.CLAUDE_START, claudemd_splice.CLAUDE_END)
+        except claudemd_splice.MalformedMarkersError:
+            continue
+        if span is None:
+            continue
+        block = text[span.start:span.end]
+        for kind, rx in _VOLATILE_PATTERNS:
+            for match in rx.findall(block):
+                findings.append((fname, kind, str(match)[:40]))
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -444,6 +483,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     check_p = sub.add_parser("check", help="Derive-don't-fabricate across every map-*.ngf.md + index.ngf.md")
     check_p.add_argument("root", type=Path)
+
+    cache_p = sub.add_parser("cache-check", help="Flag volatile content in the always-loaded pointer block")
+    cache_p.add_argument("root", type=Path)
 
     savings_p = sub.add_parser("savings", help="Print the token-save number for the whole map set")
     savings_p.add_argument("root", type=Path)
@@ -490,6 +532,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         result = check_maps_fabrication(args.root)
         _print_fabrication(result)
         return 0 if result.ok else 1
+
+    if args.mode == "cache-check":
+        findings = check_cache_stability(args.root)
+        if not findings:
+            print("PASS: cache-hygiene — pointer block is stable (no volatile content in the cached prefix)")
+            return 0
+        print(f"WARN: cache-hygiene — {len(findings)} volatile item(s) in the pointer block "
+              "(may reduce prompt-cache hits):", file=sys.stderr)
+        for fname, kind, sample in findings:
+            print(f"  - {fname}: {kind}: {sample}", file=sys.stderr)
+        return 1
 
     if args.mode == "savings":
         report = compute_maps_token_report(args.root)

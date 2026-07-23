@@ -1,7 +1,7 @@
 {
   "name": "context-os",
-  "version": "0.2.0",
-  "description": "Stop Claude burning your tokens re-exploring your own code every session. context-os maps your repo into small, portable context files — one per folder plus a root index — that Claude (or Codex, or Gemini) reads on demand instead of re-scanning your whole project. It keeps the maps honest: a drift check flags a map the moment its folder's code changes, so a stale map warns you instead of quietly lying. And /snapshot captures your current session — a compacted summary plus the work state — into one portable file, so you can stop mid-task, move to another machine or another model, and pick up cold. Four commands (/context-os, /context-os-update, /context-os-status, /snapshot), three agents, a drift-detection hook, and a printed token-save number measured against your real source every run. It never invents files or connections — every node traces to real code — and never touches your existing CLAUDE.md beyond its own marked block. Free, offline, $0, no server, no API keys, stdlib-only scanner.",
+  "version": "0.3.0",
+  "description": "Stop Claude burning your tokens re-exploring your own code every session. context-os maps your repo into small, portable context files — one per folder plus a root index — that Claude (or Codex, or Gemini) reads on demand instead of re-scanning your whole project. It keeps the maps honest: a drift check flags a map the moment its folder's code changes, so a stale map warns you instead of quietly lying. And /snapshot captures your current session — a compacted summary plus the work state — into one portable file, so you can stop mid-task, move to another machine or another model, and pick up cold. Four commands (/context-os, /context-os-update, /context-os-status, /snapshot), sharded per-folder enrichment agents, a drift-detection hook, and a printed token-save number measured against your real source every run. It also lets an agent retrieve the exact original behind any map reference (compress-cache-retrieve), exposes the maps + retrieval over an MCP server so any agent or proxy can consume them, and now maps config/docs/data folders too — not just code. It never invents files or connections — every node traces to real code — and never touches your existing CLAUDE.md beyond its own marked block. Free, offline, $0, no server, no API keys, stdlib-only.",
   "author": {
     "name": "Eyal Nof",
     "email": "verbalogic.project@gmail.com"
@@ -16,6 +16,8 @@
     "claude-md",
     "portability",
     "snapshot",
-    "session-handoff"
+    "session-handoff",
+    "mcp",
+    "compression"
   ]
 }

@@ -31,7 +31,9 @@ Read your folder's **structural digest** if the orchestrator emitted one:
 signatures + imports). It is enough for most one-line descriptions and for the edge picture.
 If there is no digest, read the folder's source files directly. Read a **full file** only
 when the digest isn't enough — e.g. to author a specific risk area, or to confirm a
-non-import edge.
+non-import edge. **Leave any node that already carries a real description** (non-code
+content nodes — config/doc/data/log — are pre-described deterministically); only fill the
+`: <path>` placeholders on code nodes.
 
 ### 2. Enrich the map in place (`Edit` only your folder's `map-*.ngf.md`)
 

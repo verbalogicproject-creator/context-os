@@ -5,6 +5,32 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-22
+
+[Headroom](https://github.com/chopratejas/headroom)'s token-saving ideas, adopted **in-domain**
+(stdlib-only, no Headroom dependency). context-os is the ahead-of-time *structural* compressor;
+these make it stronger and let it stack under any runtime compressor.
+
+### Added
+- **CCR — retrieve (`scripts/retrieve.py`).** The map is the compressed view; the source is the
+  retrievable original. `retrieve <root> <path[:symbol]>` returns the EXACT original block (a
+  whole file, or one `def`/`class`/`function`/const via best-effort symbol-span resolution) plus
+  a content hash — so a reader pulls the exact original only when needed. Tests in `test_retrieve.py`.
+- **MCP server (`scripts/mcp_server.py` + `.mcp.json`).** A stdlib stdio JSON-RPC server exposing
+  `contextos_map(folder?)` and `contextos_retrieve(anchor)` — CCR as MCP tools, so any agent or
+  proxy (including Headroom) can read the compressed maps and fetch originals. Tests in `test_mcp.py`.
+- **Content-aware maps for non-code folders (`scripts/compress.py`).** config/JSON (keys+shape),
+  docs (title+headings), data (columns+rows), and logs (errors/warnings) now get a deterministic
+  compressed map node — so config/docs/data folders are mapped too, not just code. Skips tooling
+  dot-dirs. Tests in `test_compress.py`.
+- **Cache-stability hygiene (`audit.py cache-check`).** Flags volatile content (timestamps/UUIDs/
+  hashes/JWTs) in the always-loaded CLAUDE.md/AGENTS.md pointer block that would bust provider
+  prompt caches; the block is guaranteed byte-stable. Tests in `test_cache_check.py`.
+
+### Changed
+- The scanner (`scan.py`) now also emits non-code content nodes with their compressed views;
+  `ScanNode` gains a `desc` field. The fabrication audit still gates every node.
+
 ## [0.2.0] — 2026-07-22
 
 Generation cost optimization — prompted by the memorylog- dogfood, where the monolithic
