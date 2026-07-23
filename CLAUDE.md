@@ -17,6 +17,9 @@ example of its output, see `demo/`, which carries real, committed maps.)
   drift hooks that keep each map's `staleness` flag honest.
 - `scripts/` — stdlib-only, offline:
   - `scan.py` — deterministic scanner + the per-folder `.ngf.md` emit (`--emit-ngf`).
+  - `plan.py` — deterministic folder ranker (DEEP/SKELETON/FOLD) from the scan graph, so
+    `/context-os` enriches only strategic folders (`--deep-only`) and folds content into
+    parents (`--apply-fold`). No LLM.
   - `claudemd_splice.py` — the ONLY code path allowed to write the CLAUDE.md/AGENTS.md
     marked block.
   - `audit.py` — the `.ngf.md`-aware `.ctx` parser + `check` (derive-don't-fabricate, + an

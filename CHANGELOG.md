@@ -5,6 +5,28 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-23
+
+Map what matters. Instead of blindly enriching every folder, `/context-os` now ranks folders and
+enriches only the strategic ones — validated when the full ARIA run (77 folders, ~1.78M Haiku tokens,
+~18 min) confirmed most of that spend went to folders a real session never reads.
+
+### Added
+- **`scripts/plan.py` — deterministic folder ranker.** From the scan graph (code files, cross-folder
+  import in/out-degree, entry points — no LLM, no `tree` binary), it tiers every folder **DEEP**
+  (enrich), **SKELETON** (structure-only, no enricher), or **FOLD** (pure docs/data/config). An entry
+  point flags a folder `borderline` for the agent to promote rather than auto-enriching every route.
+  `--deep-only` prints the enrich list; `--apply-fold` merges each FOLD folder's already-described
+  content into its parent map and prunes the index (nothing vanishes — it names its `fold_into`
+  parent). Tests in `test_plan.py`.
+- **`/context-os` is strategic by default** (new plan step + fold step): rank → enrich only DEEP (plus
+  promoted borderline) → fold content folders into parents. `--all` restores exhaustive mapping. On
+  ARIA: ~40 strategic folders enriched instead of 77, and the fold took the map set 77 → 58 files.
+
+### Changed
+- The repair loop now resets a failing folder's skeleton before re-enriching (matches the validated
+  repair flow: reset → re-enrich → re-check).
+
 ## [0.3.2] — 2026-07-23
 
 Post-dogfood hardening. The v0.3.1 "measure, don't claim" work was validated by the first real

@@ -35,6 +35,17 @@ and the edge advisory. Fixed at root cause: `map-enricher.md` hardened (keep dis
 `check` PASS. Conclusion: the orchestration is sound; the audit gate is load-bearing for the
 default Haiku tier.
 
+**v0.4.0 — map what matters.** The full ARIA run (77 folders, ~1.78M Haiku tokens) proved most of
+that spend went to folders a session never reads. `plan.py` ranks folders from the scan graph into
+DEEP / SKELETON / FOLD; `/context-os` now enriches only DEEP (~40 of ARIA's 77) and folds content
+folders into parents (77 → 58 maps). Deterministic, no LLM.
+
+**Next big lever — lazy / on-demand generation.** Even mapping ~40 strategic folders upfront pays for
+folders a given session never opens. The PreToolUse hook already fires on first Read/Grep of a folder;
+have it generate that folder's map *on first touch* (deterministic skeleton instantly, enrich in the
+background), so generation cost tracks actual use — the natural conclusion of "measure delivered."
+Guard it behind an opt-in; keep the eager `/context-os` for a full pre-map.
+
 Still open from the same review (scoped, not yet built):
 - **Orchestrator repair loop.** Because default-Haiku output isn't ship-clean on the first pass
   (see above), have `/context-os` re-run *only* the folders whose nodes fail `check` (bounded
