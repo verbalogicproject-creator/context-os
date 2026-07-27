@@ -8,15 +8,47 @@ session*. On a large repo that's hundreds of thousands of tokens, every time, be
 does any real work. It's also why moving a project to another model feels like starting
 over.
 
+**And that reading isn't charged once.** Everything already in the conversation is
+re-processed on every message you send after it. So a file read early in a session is paid
+for again, and again, until the session ends. That is the part most people never see, and
+it is where the money actually goes:
+
+```
+context-os — real token usage across 5328 turns:
+  cache read (prefix re-processed each turn)   2,364,116,086    70.9% of cost
+  cache create (first sight of new content)       39,313,779    14.7%
+  output                                           9,579,925    14.4%
+  raw input (uncached)                                76,817     0.0%
+
+  mean prefix re-processed per turn: 443,715 tokens
+
+  admitting 30,000 tokens at turn 100 costs 524.05x its apparent size
+  (156,840,000 cache-read tokens over 5228 remaining turns)
+```
+
+Those are real numbers from one real session, not an estimate — Claude Code records what
+each message actually cost, and `measure.py cost` reads it back. **Seven out of every ten
+tokens went on re-reading the conversation so far.** Reading five files early doesn't cost
+you 30,000 tokens; on that session it cost 524 times that.
+
+This is why a small map is worth so much more than the size difference suggests. Swapping a
+30,000-token source read for a 3,000-token map read doesn't save you 27,000 tokens — it
+saves you 27,000 tokens *on every message that follows*. And it's why "your session starts
+cheaper" is the wrong promise: the saving isn't at the start, it accrues the whole way
+through.
+
 context-os maps your repo once into small, portable context files — one per folder plus
 a root index — that an agent reads on demand instead of re-scanning your whole project.
 The maps are plain Markdown with a YAML header, so **Claude, Codex, and Gemini all read
 them the same way, cold.** And they keep themselves honest: when a folder's code changes,
 its map flips to `DRIFTED` so a stale map *warns you* instead of quietly lying.
 
-This isn't a pitch — it's two measurements, and we keep them honest by keeping them
-separate. First, the **ceiling**: how much smaller the maps are than your source, computed
-against *your* files on every run:
+## Three numbers, kept separate on purpose
+
+This isn't a pitch — it's measurements, and they stay honest by never being merged.
+
+**1. The ceiling** — how much smaller the maps are than your source, computed against
+*your* files on every run:
 
 ```
 188 source files (~46,000 tokens to scan) under . -> CEILING: the context-os map set is
@@ -25,13 +57,28 @@ session could save, not what it did — realized only when the agent reads a map
 of re-reading its source.
 ```
 
-That 93% is an *artifact-size* number — a real, reproducible upper bound. It becomes real
-tokens only when a session actually reads the map instead of exploring. So context-os also
-measures what a session **delivered**: a hook logs, per session, when the agent read a map
-versus re-read (or grepped) the source it already maps, and `python3 measure.py session .`
-(or `/context-os-status`) reports the delivered number and the map-consultation rate. Ceiling
-tells you the opportunity; delivered tells you whether it landed. We won't sell you the
-ceiling as if it were the delivered number.
+That 93% is an *artifact-size* upper bound: real and reproducible, but it becomes real
+tokens only if a session actually reads the map.
+
+**2. What a session delivered** — a hook logs, per session, when the agent read a map
+versus re-read (or grepped) source it already maps. `python3 scripts/measure.py session .`
+(or `/context-os-status`) reports the map-consultation rate. Ceiling tells you the
+opportunity; delivered tells you whether it landed.
+
+**3. Where your tokens actually went** — `python3 scripts/measure.py cost <session.jsonl>`
+reads the real per-message usage Claude Code already records for you:
+
+```
+python3 scripts/measure.py cost ~/.claude/projects/<your-project>/<session-id>.jsonl
+python3 scripts/measure.py cost <session>.jsonl --at-turn 100 --tokens 30000
+```
+
+This one is a **cost profile, not a savings figure** — it shows where the spend is, which
+is what makes the case for maps. It doesn't prove the maps saved you anything; only number
+2 speaks to that.
+
+We won't sell you the ceiling as if it were the delivered number, and we won't sell you a
+cost profile as if it were either.
 
 Generating the maps costs about one cold exploration, once. Every session after *can* read
 the map instead — and now you can measure whether it did.
@@ -140,8 +187,20 @@ continues from where you stopped — no prior coordination.
   and edges come from the deterministic scanner — but `check` does not prove a description
   is accurate or an edge points the right way; it flags an edge to a missing target as an
   advisory. A `DRIFTED` flag then tells you when even a correct map has gone out of date.)
+- **Never puts a secret in a map.** Maps are meant to be committed, so this is enforced in
+  code, not left to you to catch: the whole `.env` family is skipped by name, anything your
+  `.gitignore` excludes is skipped, and the map of a config or log file describes its
+  *shape* — key names, column headers, how many errors — never its contents.
+- **Never lets a map become an instruction.** Agents read maps before source, so text that
+  drifted in from a dependency's README or someone's pull request would act as a command,
+  every session. `check` fails on text that only makes sense as an instruction about an
+  agent's tools, permissions, or secrets. (It's tuned to be precise, not exhaustive — if
+  you map a repo you don't trust, read the maps before committing them.)
+- **Never reads outside your project.** The MCP tools confine every path to the project
+  root, so an anchor pointing elsewhere on your disk resolves to nothing.
 - **Never clobbers your CLAUDE.md.** It only ever touches its own marked block, backs up
-  before writing, and refuses (rather than guesses) if you've hand-edited the markers.
+  before writing, writes atomically (so an interrupted run can't truncate it), keeps your
+  line endings, and refuses (rather than guesses) if you've hand-edited the markers.
 - **Never phones home.** Free, offline, `$0`, no server, no API keys — a standard-library
   Python scanner and nothing else.
 
@@ -171,8 +230,9 @@ CODEBASE-REPORT.md  a module-by-module map of this plugin's own code
   original, map non-code files, snapshot for cold resume.
 - **[SPEC.md](SPEC.md)** — the file-format specification (`ctx/1.1` + the three kinds).
 - **[ROADMAP.md](ROADMAP.md)** — what's planned next (git integration, Merkle-tree drift).
-- **[SECURITY.md](SECURITY.md)** — privacy posture (no network, no keys, stdlib-only) and how
-  to report a vulnerability.
+- **[SECURITY.md](SECURITY.md)** — what a map may and may not contain (no secrets, no
+  instructions, nothing outside your project), the residual risks stated plainly, and how to
+  report a vulnerability.
 - **[CODEBASE-REPORT.md](CODEBASE-REPORT.md)** — a module-by-module map of this plugin's own
   code, for anyone extending context-os itself.
 

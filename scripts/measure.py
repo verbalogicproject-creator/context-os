@@ -156,8 +156,8 @@ def summarize_transcript(root: Path, transcript: Path) -> dict:
 # records the REAL usage on every assistant turn, so the delivered number never had to be a
 # guess; nothing was reading it.
 #
-# WHAT THE REAL NUMBERS SHOWED, measured over three long sessions (5,319 / 2,262 / 1,325
-# turns) before this was written:
+# WHAT THE REAL NUMBERS SHOWED, measured over three long sessions (5,328 / 2,262 / 1,325
+# turns; the first was still live, so its count is a snapshot, not a fixed figure):
 #
 #     cache_read  61-73%   cache_create  10-15%   output  14-25%   raw input  ~0.02%
 #

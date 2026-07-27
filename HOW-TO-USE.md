@@ -55,7 +55,9 @@ It will:
 3. **Add a short pointer** to your `CLAUDE.md` and `AGENTS.md` telling any AI agent to read
    the map before exploring. (Your existing content is untouched — it only adds its own
    marked block, and backs the file up first.)
-4. **Print the token-save**, measured against your actual source.
+4. **Print the ceiling** — how much smaller the maps are than your source, measured against
+   your actual files. That's the most a session could save, not what it did; see the FAQ
+   for the two numbers that tell you what actually landed.
 
 Now just work normally. Because of the pointer, a fresh session reads the map for the
 folder it's touching instead of re-scanning your repo. You don't do anything — that's the
@@ -216,9 +218,23 @@ versioned, not overwritten. Snapshots are point-in-time — they don't drift, th
   and uses no API key or account.
 - **It never invents.** Every entry in a map traces to a real file that was actually found
   and read. A built-in check fails the run if anything was fabricated.
+- **No secrets in your maps.** Maps are meant to be committed, so this is enforced in code
+  rather than left for you to catch. The whole `.env` family is skipped by name (`.env`,
+  `.env.local`, `.env.production`, and so on), anything your `.gitignore` excludes is
+  skipped, and the map of a config or log file describes its *shape* — key names, column
+  headers, how many errors — never its contents.
+- **No instructions in your maps.** Agents are told to read maps before source, so text
+  that drifted in from a dependency's README or someone's pull request would act as a
+  command, every session. The `check` audit fails on text that only makes sense as an
+  instruction about an agent's tools, permissions, or secrets. It's tuned to be precise
+  rather than exhaustive — if you map a repo you don't trust, read the maps before you
+  commit them.
+- **Nothing outside your project.** The MCP tools confine every path to the project root,
+  so an anchor pointing elsewhere on your disk resolves to nothing.
 - **It never overwrites your notes.** It only ever touches its own marked block in
-  `CLAUDE.md`/`AGENTS.md`, writes a timestamped backup first, and refuses (rather than
-  guessing) if those markers have been hand-edited.
+  `CLAUDE.md`/`AGENTS.md`, writes a timestamped backup first, writes atomically so an
+  interrupted run can't truncate the file, keeps your line endings as they were, and
+  refuses (rather than guessing) if those markers have been hand-edited.
 - **No dependencies to trust.** The scanner is Python standard library only — nothing is
   pulled from a package registry, so there's no supply-chain surface.
 
@@ -246,6 +262,28 @@ Run `/context-os-update` when you want to catch them up (or before an important 
 **My token-save number looks tiny or negative.**
 The project or folder is very small, so the map's header outweighs the source. The saving
 shows on real codebases, where source dwarfs the map.
+
+**Why is the saving bigger than the size difference suggests?**
+Because reading a file isn't charged once. Everything already in the conversation gets
+re-processed on every message you send after it, so a file read early in a session is paid
+for again and again until that session ends. Swapping a 30,000-token source read for a
+3,000-token map read doesn't save 27,000 tokens — it saves 27,000 tokens *on every message
+that follows*.
+
+You can see this on your own sessions. Claude Code records what each message actually cost:
+
+```bash
+python3 scripts/measure.py cost ~/.claude/projects/<your-project>/<session-id>.jsonl
+python3 scripts/measure.py cost <session>.jsonl --at-turn 100 --tokens 30000
+```
+
+On one real 5,328-message session, **71% of all token cost was re-processing the
+conversation so far**, and reading 30,000 tokens of source at message 100 cost 524x its
+apparent size.
+
+Note what that number is and isn't: it's a **cost profile**, showing where your tokens go.
+It is not proof the maps saved you anything — that's the map-consultation rate from
+`measure.py session .`.
 
 **What languages are supported?**
 The scanner understands imports for Python, TypeScript/JavaScript (+ JSX/TSX/Vue/Svelte),
@@ -282,8 +320,10 @@ CI:
 python3 scripts/scan.py .        --emit-ngf   # write the per-folder map skeletons
 python3 scripts/ctx_staleness.py stamp-all .  # stamp the drift baseline
 python3 scripts/ctx_staleness.py status .     # exit 1 if any map is DRIFTED  (a CI drift gate)
-python3 scripts/audit.py check .              # exit 1 if any map node is fabricated
-python3 scripts/audit.py savings .            # print the token-save number
+python3 scripts/audit.py check .              # exit 1 on a fabricated node OR instruction-shaped text
+python3 scripts/audit.py savings .            # print the CEILING (artifact size)
+python3 scripts/measure.py session .          # print the DELIVERED number (did the agent read the map?)
+python3 scripts/measure.py cost <session>.jsonl  # print where your tokens actually went (real usage)
 ```
 
 (The skeletons that `scan.py` writes have placeholder descriptions; the `/context-os`
