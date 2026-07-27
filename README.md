@@ -86,11 +86,12 @@ that's already enriched. So you pay for the handful of folders you worked in, no
 /context-os-catchup         # enrich just those folders, on demand
 ```
 
-## The four commands
+## The five commands
 
 | Command | What it does |
 |---|---|
 | `/context-os` | Map (or re-map) the project: generate maps + the pointer block, print the token-save. |
+| `/context-os-catchup` | Enrich only the folders you actually worked in this session (the lazy companion to a `--skeleton` pass). |
 | `/context-os-update` | Refresh only the folders whose code drifted since their map was last verified. |
 | `/context-os-status` | Read-only: which maps are current vs `DRIFTED`, and the current token-save. |
 | `/snapshot` | Capture this session — a compacted summary + the work-state — into one portable file so you can resume cold on another machine or model. |
@@ -147,25 +148,32 @@ continues from where you stopped — no prior coordination.
 ## Layout
 
 ```
-commands/   the four slash commands
+commands/   the five slash commands
 agents/     map-enricher (per-folder, parallel) + map-updater (drift-only refresh)
 hooks/      the drift hooks (hooks.json + handlers)
 scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, snapshot.py,
             retrieve.py (CCR), compress.py (non-code), mcp_server.py (stdlib only)
 .mcp.json   the MCP server config (contextos_map + contextos_retrieve)
 demo/       a tiny two-service app with real, committed context-os output
+docs/       numbered, progressive chapters that build the demo app's maps step by step
 SPEC.md     the format specification (ctx/1.1 + the three kinds)
+CODEBASE-REPORT.md  a module-by-module map of this plugin's own code
 ```
 
 ## Documentation
 
 - **[INSTALL.md](INSTALL.md)** — install in two commands (beginner-friendly): prerequisites,
   verifying it worked, updating, uninstalling, troubleshooting.
-- **[HOW-TO-USE.md](HOW-TO-USE.md)** — the full user manual: the four commands in depth, **how
+- **[HOW-TO-USE.md](HOW-TO-USE.md)** — the full user manual: the five commands in depth, **how
   to read a map**, the drift workflow, committing maps, `/snapshot`, privacy & security, FAQ.
+- **[docs/](docs/00-mental-model.md)** — numbered, hands-on chapters that build one small
+  runnable thing at a time on the `demo/` app: generate a map, read it, drift it, retrieve an
+  original, map non-code files, snapshot for cold resume.
 - **[SPEC.md](SPEC.md)** — the file-format specification (`ctx/1.1` + the three kinds).
 - **[ROADMAP.md](ROADMAP.md)** — what's planned next (git integration, Merkle-tree drift).
 - **[SECURITY.md](SECURITY.md)** — privacy posture (no network, no keys, stdlib-only) and how
   to report a vulnerability.
+- **[CODEBASE-REPORT.md](CODEBASE-REPORT.md)** — a module-by-module map of this plugin's own
+  code, for anyone extending context-os itself.
 
 Free, offline, `$0`, no server, no API keys. Apache-2.0 — Eyal Nof.

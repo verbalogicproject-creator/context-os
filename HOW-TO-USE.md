@@ -9,7 +9,7 @@ the file format's technical spec, see **`SPEC.md`**.
 
 1. [What context-os is (the 2-minute version)](#1-what-context-os-is)
 2. [Your first run](#2-your-first-run)
-3. [The four commands](#3-the-four-commands)
+3. [The five commands](#3-the-five-commands)
 4. [How to read a map](#4-how-to-read-a-map)
 5. [The daily workflow — drift](#5-the-daily-workflow--drift)
 6. [Committing maps to git](#6-committing-maps-to-git)
@@ -73,11 +73,12 @@ Start `--skeleton`, upgrade when you want the prose.
 
 ---
 
-## 3. The four commands
+## 3. The five commands
 
 | Command | What it does | When to run it |
 |---|---|---|
 | **`/context-os`** | Generate (or fully refresh) the maps + the pointer block; print the token-save. | Once per project, and any time you want to rebuild from scratch. |
+| **`/context-os-catchup`** | Enrich only the folders you actually worked in this session (the lazy companion to a `--skeleton` pass). | After `/context-os --skeleton`, any time you've touched a few folders and want them described. |
 | **`/context-os-update`** | Refresh **only** the folders whose code drifted since their map was verified. Reports every node it removes, by name. | When `/context-os-status` shows drift. Optionally scoped: `/context-os-update src/api`. |
 | **`/context-os-status`** | Read-only. Lists each map as `verified` or `DRIFTED`, and the current token-save. Changes nothing. | Anytime you want to know if the maps are current. |
 | **`/snapshot`** | Capture the current session — a summary + the work-state — into one portable file for cold resume. | Before you stop, switch machines, or hand off to another model. See §7. |
