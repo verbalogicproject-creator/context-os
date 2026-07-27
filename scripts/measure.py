@@ -149,6 +149,128 @@ def summarize_transcript(root: Path, transcript: Path) -> dict:
     }
 
 
+# --- real token usage, straight from the transcript ------------------------------------
+#
+# WHY THIS EXISTS. Every other number in this file is `bytes/4`. That is fine for a ceiling
+# and wrong for a delivered figure — it is an estimate of an estimate. Claude Code already
+# records the REAL usage on every assistant turn, so the delivered number never had to be a
+# guess; nothing was reading it.
+#
+# WHAT THE REAL NUMBERS SHOWED, measured over three long sessions (5,319 / 2,262 / 1,325
+# turns) before this was written:
+#
+#     cache_read  61-73%   cache_create  10-15%   output  14-25%   raw input  ~0.02%
+#
+# The dominant cost is not the one-time discovery pass. It is `cache_read` — the accumulated
+# prefix, re-processed on EVERY turn. Mean prefix across those sessions was 238k-467k tokens
+# per turn.
+#
+# That changes what a map is worth, and in which direction. A file read is not a one-time
+# charge: a 30k-token read admitted at turn 100 of a 5,000-turn window is ~30k of
+# cache_create PLUS 30k re-read on each of the ~4,900 turns that follow. Substituting a 3k
+# map for it is worth ~132M cache-read tokens, not 27k. The mechanism is far stronger than
+# "sessions start cheaper" claims — and "start" is the wrong word for it, because the saving
+# accrues across the whole session, not at its beginning.
+#
+# So the cost model here is an INTEGRAL over turns, and `--at-turn` exists to price a
+# decision at the moment it is made rather than in aggregate.
+
+#: Cost of each token class as a multiple of one input token, per Anthropic's published
+#: ratios (cache read 0.1x, cache write 1.25x, output 5x). Ratios, not prices — they are
+#: what decides where the money goes, and they hold across model tiers.
+WEIGHTS = {
+    "input_tokens": 1.0,
+    "cache_creation_input_tokens": 1.25,
+    "cache_read_input_tokens": 0.1,
+    "output_tokens": 5.0,
+}
+
+
+def usage_totals(transcript_text: str) -> dict:
+    """Sum the real per-turn `usage` blocks in a Claude Code transcript.
+
+    Unlike `_iter_tool_paths` this is not a heuristic over tool arguments — `usage` is
+    reported by the API itself. It is still guarded, because the transcript's *envelope*
+    (where `usage` sits in the JSON) is not a stable contract even though its contents are.
+    """
+    totals = {key: 0 for key in WEIGHTS}
+    turns = 0
+    for line in transcript_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message = obj.get("message") if isinstance(obj, dict) else None
+        usage = message.get("usage") if isinstance(message, dict) else None
+        if not isinstance(usage, dict):
+            continue
+        turns += 1
+        for key in totals:
+            value = usage.get(key)
+            if isinstance(value, int):
+                totals[key] += value
+    return {"turns": turns, **totals}
+
+
+def cost_profile(totals: dict) -> dict:
+    """Weighted cost share per token class, plus the mean prefix re-processed each turn."""
+    weighted = {key: totals.get(key, 0) * weight for key, weight in WEIGHTS.items()}
+    grand = sum(weighted.values())
+    turns = totals.get("turns", 0)
+    return {
+        "turns": turns,
+        "totals": {key: totals.get(key, 0) for key in WEIGHTS},
+        "weighted_share": {
+            key: (round(value / grand, 4) if grand else 0.0) for key, value in weighted.items()
+        },
+        "mean_prefix_tokens": round(totals.get("cache_read_input_tokens", 0) / turns) if turns else 0,
+    }
+
+
+def context_tax(tokens: int, turns_remaining: int) -> dict:
+    """What admitting `tokens` into context actually costs over `turns_remaining` turns.
+
+    The number people reason with is `tokens` — the one-time size of the read. The number
+    they pay is this one. Kept as a function rather than a comment because the gap between
+    the two is the entire argument for a map, and it should be computable, not asserted.
+    """
+    create = tokens * WEIGHTS["cache_creation_input_tokens"]
+    reread = tokens * turns_remaining * WEIGHTS["cache_read_input_tokens"]
+    return {
+        "tokens": tokens,
+        "turns_remaining": turns_remaining,
+        "cache_read_tokens": tokens * turns_remaining,
+        "weighted_cost": round(create + reread, 1),
+        "multiple_of_naive": round((create + reread) / tokens, 2) if tokens else 0.0,
+    }
+
+
+def format_cost(profile: dict) -> str:
+    share = profile["weighted_share"]
+    totals = profile["totals"]
+    lines = [
+        f"context-os — real token usage across {profile['turns']} turns:",
+        f"  cache read (prefix re-processed each turn) {totals['cache_read_input_tokens']:>15,}"
+        f"   {share['cache_read_input_tokens']:>6.1%} of cost",
+        f"  cache create (first sight of new content)  {totals['cache_creation_input_tokens']:>15,}"
+        f"   {share['cache_creation_input_tokens']:>6.1%}",
+        f"  output                                     {totals['output_tokens']:>15,}"
+        f"   {share['output_tokens']:>6.1%}",
+        f"  raw input (uncached)                       {totals['input_tokens']:>15,}"
+        f"   {share['input_tokens']:>6.1%}",
+        "",
+        f"  mean prefix re-processed per turn: {profile['mean_prefix_tokens']:,} tokens",
+        "",
+        "Cost is the INTEGRAL of context size over turns, not a startup charge. Anything",
+        "admitted early is paid again on every turn that follows — which is why replacing a",
+        "source re-read with a map read is worth far more than the size difference suggests.",
+    ]
+    return "\n".join(lines)
+
+
 def catchup_targets(root: Path, session_id: str) -> List[str]:
     """Folders touched this session whose map is still skeleton-only (unenriched).
 
@@ -194,7 +316,49 @@ def main(argv: Optional[List[str]] = None) -> int:
     tr.add_argument("transcript", type=Path)
     tr.add_argument("--json", action="store_true")
 
+    cost = sub.add_parser(
+        "cost", help="REAL token usage from a Claude Code .jsonl transcript (not an estimate)"
+    )
+    cost.add_argument("transcript", type=Path)
+    cost.add_argument("--json", action="store_true")
+    cost.add_argument(
+        "--at-turn", type=int, default=None, metavar="N",
+        help="Also price admitting --tokens into context at turn N of this session.",
+    )
+    cost.add_argument("--tokens", type=int, default=30000,
+                      help="Token size to price with --at-turn (default 30000, ~5 medium files).")
+
     args = parser.parse_args(argv)
+
+    if args.mode == "cost":
+        try:
+            text = args.transcript.read_text(errors="ignore")
+        except OSError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        totals = usage_totals(text)
+        if not totals["turns"]:
+            print("no usage data in that transcript — wrong file, or the format changed",
+                  file=sys.stderr)
+            return 1
+        profile = cost_profile(totals)
+        if args.at_turn is not None:
+            profile["context_tax"] = context_tax(
+                args.tokens, max(0, profile["turns"] - args.at_turn)
+            )
+        if args.json:
+            print(json.dumps(profile, indent=2))
+        else:
+            print(format_cost(profile))
+            tax = profile.get("context_tax")
+            if tax:
+                print(
+                    f"\n  admitting {tax['tokens']:,} tokens at turn {args.at_turn} costs "
+                    f"{tax['multiple_of_naive']}x its apparent size "
+                    f"({tax['cache_read_tokens']:,} cache-read tokens over "
+                    f"{tax['turns_remaining']} remaining turns)"
+                )
+        return 0
 
     if args.mode == "session":
         session_id = args.session or session_log.latest_session_id(args.root)
