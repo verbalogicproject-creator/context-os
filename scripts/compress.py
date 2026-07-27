@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-CONFIG_EXT = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env", ".properties"}
+CONFIG_EXT = {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".properties"}
 DOC_EXT = {".md", ".mdx", ".rst", ".txt", ".adoc"}
 DATA_EXT = {".csv", ".tsv"}
 LOG_EXT = {".log"}
@@ -27,8 +27,30 @@ _TYPE = {
 }
 
 
+def is_secret_file(path: Path) -> bool:
+    """True for files whose whole purpose is to hold secrets, so they get no map node.
+
+    WHY `.env` IS NO LONGER A CONFIG TYPE. It used to sit in ``CONFIG_EXT``, so
+    ``_compress_config`` listed its key names into the folder's map description — and map
+    files are designed to be COMMITTED. The key regex captures the name before the ``=``,
+    never the value, so this did not leak a secret's text; what it leaked is the shape of
+    someone's infrastructure — ``STRIPE_SECRET_KEY``, ``DATABASE_URL``, internal service
+    names — into a file they were told to check in and, by this tool's own stated audience,
+    were never going to read.
+
+    Excluding it costs the map nothing. A `.env` is a flat list of names by construction;
+    there is no architecture in it to describe. The match is on the NAME, not the suffix,
+    because the common real-world cases (``.env.local``, ``.env.production``) do not carry
+    ``.env`` as a suffix at all and would otherwise slip straight past an extension check.
+    """
+    name = path.name.lower()
+    return name == ".env" or name.startswith(".env.") or name.endswith(".env")
+
+
 def content_type(path: Path) -> Optional[str]:
     """The context-os `[type]` for a non-code file, or None if it isn't a mapped content type."""
+    if is_secret_file(path):
+        return None
     return _TYPE.get(path.suffix.lower())
 
 
@@ -90,12 +112,27 @@ def _compress_data(text: str) -> str:
 
 
 def _compress_log(text: str) -> str:
+    """Counts and severity KINDS — never a line of the log itself.
+
+    This used to append ``first error: {errs[0].strip()[:80]}`` — 80 characters of a real
+    log line, verbatim, into a map description that is meant to be committed and pushed.
+    Error lines are exactly where runtime *values* surface: connection strings with embedded
+    passwords, tokens in URLs, internal hostnames, customer identifiers in a stack frame.
+    Every other compressor in this module reports SHAPE (key names, column headers, section
+    titles); this one reported content, and it was the only one that did.
+
+    The severity kinds are kept because they are the part that was actually load-bearing —
+    "this folder has a log with tracebacks in it" is the signal a map node should carry.
+    Which traceback is not, and cannot be made safe by truncating it.
+    """
     lines = text.splitlines()
     errs = [ln for ln in lines if re.search(r"\b(error|exception|fatal|traceback)\b", ln, re.I)]
     warns = [ln for ln in lines if re.search(r"\bwarn(ing)?\b", ln, re.I)]
     out = f"log — {len(lines)} lines, {len(errs)} error / {len(warns)} warn"
     if errs:
-        out += f"; first error: {errs[0].strip()[:80]}"
+        kinds = sorted({m.group(0).lower() for ln in errs
+                        for m in [re.search(r"\b(error|exception|fatal|traceback)\b", ln, re.I)] if m})
+        out += "; severities: " + ", ".join(kinds)
     return out
 
 

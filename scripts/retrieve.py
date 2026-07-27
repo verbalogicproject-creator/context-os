@@ -259,11 +259,39 @@ def _split_anchor(anchor: str) -> Tuple[str, Optional[str]]:
     return anchor, None
 
 
+def contain(root: Path, relative: str) -> Optional[Path]:
+    """Join `relative` under `root`, or None if the result escapes `root`.
+
+    WHY A PLAIN JOIN IS NOT ENOUGH. ``root / relative`` looks like it confines the result
+    to the project, and it does not. Two ways out, both one-liners for a caller:
+
+        Path("/repo") / "/etc/passwd"            -> PosixPath('/etc/passwd')
+        Path("/repo") / "../../../etc/passwd"    -> escapes on resolve()
+
+    The first is the surprising one: pathlib DISCARDS the left operand entirely when the
+    right is absolute. That is documented behaviour, not a bug, which is exactly why it
+    survives review — the code reads as if it were scoped.
+
+    This matters here more than in most places because `mcp_server.py` exposes `retrieve`
+    as an MCP tool and `.mcp.json` registers that server by default. An unscoped join makes
+    every file the process can read — `~/.ssh/id_rsa`, `~/.aws/credentials` — fetchable by
+    anything that can phrase a tool call, including the model itself acting on text it read
+    out of the repository. Returning None (a plain "not found") rather than raising keeps
+    the failure indistinguishable from a genuine miss, so it tells a prober nothing.
+    """
+    try:
+        resolved = (root / relative).resolve()
+        resolved.relative_to(root.resolve())
+    except (ValueError, OSError):
+        return None
+    return resolved
+
+
 def retrieve(root: Path, anchor: str) -> dict:
     """Resolve `anchor` under `root` to the exact original block + its sha256."""
     path_part, symbol = _split_anchor(anchor)
-    fpath = root / path_part
-    if not fpath.is_file():
+    fpath = contain(root, path_part)
+    if fpath is None or not fpath.is_file():
         return {"error": f"no such file: {path_part}", "anchor": anchor}
 
     text = fpath.read_text(errors="ignore")

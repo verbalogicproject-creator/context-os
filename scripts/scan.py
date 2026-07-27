@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 import compress  # content-aware views for non-code files (config/doc/data/log)
+import gitignore  # keeps deliberately-excluded files out of committed maps
 
 FORMAT_VERSION = "ctx-scan/1.0"
 
@@ -170,35 +171,66 @@ def infer_type(filename: str, dir_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def scan_project(root: Path, exclude_dirs: Set[str]) -> Dict[str, List[str]]:
-    """Walk `root`, honoring `exclude_dirs`, and return {posix_rel_dir: [filenames]}."""
+def _rel(dirpath: str, root: Path) -> str:
+    rel_dir = Path(dirpath).relative_to(root).as_posix()
+    return "" if rel_dir == "." else rel_dir
+
+
+def scan_project(
+    root: Path, exclude_dirs: Set[str], ignore: Optional["gitignore.GitIgnore"] = None
+) -> Dict[str, List[str]]:
+    """Walk `root`, honoring `exclude_dirs` and `.gitignore`, → {posix_rel_dir: [filenames]}."""
+    ignore = ignore or gitignore.GitIgnore()
     folders: Dict[str, List[str]] = defaultdict(list)
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in exclude_dirs)
-        rel_dir = Path(dirpath).relative_to(root).as_posix()
-        if rel_dir == ".":
-            rel_dir = ""
+        rel_dir = _rel(dirpath, root)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in exclude_dirs
+            and not ignore.ignored(f"{rel_dir}/{d}" if rel_dir else d, is_dir=True)
+        )
         for name in sorted(filenames):
-            if Path(name).suffix in SOURCE_EXTENSIONS:
-                folders[rel_dir].append(name)
+            if Path(name).suffix not in SOURCE_EXTENSIONS:
+                continue
+            if ignore.ignored(f"{rel_dir}/{name}" if rel_dir else name):
+                continue
+            folders[rel_dir].append(name)
     return dict(folders)
 
 
-def scan_content(root: Path, exclude_dirs: Set[str]) -> Dict[str, List[str]]:
+def scan_content(
+    root: Path, exclude_dirs: Set[str], ignore: Optional["gitignore.GitIgnore"] = None
+) -> Dict[str, List[str]]:
     """Like `scan_project`, but for non-code CONTENT files (config/doc/data/log).
 
     Skips dot-directories (`.claude`, `.github`, `.vscode`, …) so tooling config isn't
     mapped as if it were the project.
+
+    `.gitignore` matters most on THIS walker. Source files are rarely secret; the
+    config/data/log files this one collects are exactly the ones a project keeps out of git
+    — a local `secrets.yaml`, a `dump.csv`, a debug log — and their compressed view was
+    being written into a map file the user is asked to commit. `compress.is_secret_file`
+    handles the `.env` family by name; `.gitignore` covers everything a project decided was
+    private under some other name.
     """
+    ignore = ignore or gitignore.GitIgnore()
     folders: Dict[str, List[str]] = defaultdict(list)
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in exclude_dirs and not d.startswith("."))
-        rel_dir = Path(dirpath).relative_to(root).as_posix()
-        if rel_dir == ".":
-            rel_dir = ""
+        rel_dir = _rel(dirpath, root)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in exclude_dirs and not d.startswith(".")
+            and not ignore.ignored(f"{rel_dir}/{d}" if rel_dir else d, is_dir=True)
+        )
         for name in sorted(filenames):
-            if Path(name).suffix.lower() in compress.CONTENT_EXTENSIONS:
-                folders[rel_dir].append(name)
+            path = Path(name)
+            if path.suffix.lower() not in compress.CONTENT_EXTENSIONS:
+                continue
+            if compress.is_secret_file(path):
+                continue
+            if ignore.ignored(f"{rel_dir}/{name}" if rel_dir else name):
+                continue
+            folders[rel_dir].append(name)
     return dict(folders)
 
 
@@ -598,7 +630,8 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
     per-folder tool never had to solve).
     """
     exclude_dirs = set(DEFAULT_EXCLUDE_DIRS) | (extra_exclude or set())
-    folders = scan_project(root, exclude_dirs)
+    ignore = gitignore.GitIgnore.load(root, exclude_dirs)
+    folders = scan_project(root, exclude_dirs, ignore)
     all_files: Dict[str, Set[str]] = {d: set(files) for d, files in folders.items()}
 
     stem_counts: Counter[str] = Counter()
@@ -612,7 +645,7 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
     # Non-code content files (config/doc/data/log): nodes with a deterministic compressed
     # description, no edges. Counted in stem_counts so naming stays collision-safe repo-wide.
     content_records: List[Tuple[str, str, str, str]] = []
-    for dir_path, files in scan_content(root, exclude_dirs).items():
+    for dir_path, files in scan_content(root, exclude_dirs, ignore).items():
         for f in files:
             stem = Path(f).stem
             stem_counts[stem] += 1

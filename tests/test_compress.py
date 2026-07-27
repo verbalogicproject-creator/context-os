@@ -33,7 +33,38 @@ def test_log_view(tmp_path):
     f = tmp_path / "run.log"
     f.write_text("INFO ok\nERROR boom happened\nWARN careful\nINFO ok\n")
     view = compress.compress_file(f)
-    assert "1 error" in view and "1 warn" in view and "boom happened" in view
+    assert "1 error" in view and "1 warn" in view
+    assert "error" in view  # the severity KIND is signal and stays
+
+
+def test_log_view_never_quotes_the_log(tmp_path):
+    """A log's own text must never reach a map description.
+
+    This test used to assert the opposite — `"boom happened" in view` — which pinned an
+    80-character verbatim excerpt of the first error line into a file the tool tells you to
+    commit. Error lines are where runtime values surface: connection strings with embedded
+    passwords, tokens in URLs, hostnames, a customer id in a stack frame. Truncating to 80
+    characters bounds the size of the leak, not its sensitivity.
+    """
+    f = tmp_path / "run.log"
+    f.write_text(
+        "INFO starting\n"
+        "ERROR could not connect to postgres://admin:hunter2@10.0.0.4/prod\n"
+        "FATAL token=sk-live-abcdef123456 rejected for user alice@example.com\n"
+    )
+    view = compress.compress_file(f)
+    for secret in ("hunter2", "postgres://", "sk-live", "10.0.0.4", "alice@example.com"):
+        assert secret not in view, f"log content leaked into the map description: {secret}"
+    assert "2 error" in view
+
+
+def test_dotenv_gets_no_map_node(tmp_path):
+    """`.env` and its variants are never content-compressed — see compress.is_secret_file."""
+    for name in (".env", ".env.local", ".env.production", "backend.env"):
+        f = tmp_path / name
+        f.write_text("STRIPE_SECRET_KEY=sk_live_x\nDATABASE_URL=postgres://u:p@h/db\n")
+        assert compress.content_type(f) is None, f"{name} must not be a mapped content type"
+        assert compress.compress_file(f) == name  # bare filename, no key names extracted
 
 
 def test_non_code_folder_gets_a_map_node(tmp_path):

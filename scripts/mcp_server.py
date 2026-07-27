@@ -33,11 +33,18 @@ def _root(args: dict) -> Path:
     return Path(r).resolve()
 
 
-def _map_path(root: Path, folder: Optional[str]) -> Path:
+def _map_path(root: Path, folder: Optional[str]) -> Optional[Path]:
+    """The map file for `folder`, or None if `folder` points outside the project.
+
+    Same containment rule as `retrieve.contain` — an absolute or `../` folder would
+    otherwise escape the root, because `root / folder` silently discards `root` when
+    `folder` is absolute. Narrower blast radius than `contextos_retrieve` (the filename is
+    pinned to `map-*.ngf.md`), but it is the same bug and it gets the same guard.
+    """
     if not folder or folder in (".", "/"):
         return root / "index.ngf.md"
     base = Path(folder).name
-    return root / folder / f"map-{base}.ngf.md"
+    return _retrieve.contain(root, str(Path(folder) / f"map-{base}.ngf.md"))
 
 
 TOOLS = [
@@ -77,7 +84,10 @@ TOOLS = [
 def call_tool(name: str, args: dict) -> str:
     root = _root(args)
     if name == "contextos_map":
-        path = _map_path(root, args.get("folder"))
+        folder = args.get("folder")
+        path = _map_path(root, folder)
+        if path is None:
+            return f"no map for {folder!r} — folder is outside the project."
         if not path.is_file():
             return f"no map at {path} — run /context-os to generate maps first."
         return path.read_text(errors="ignore")

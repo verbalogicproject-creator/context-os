@@ -23,7 +23,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -114,6 +116,36 @@ def replace_block(text: str, start_marker: str, end_marker: str, new_block: str)
     return text[: span.start] + new_block + text[span.end :]
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` atomically: temp file in the same dir, then os.replace.
+
+    `ctx_staleness.py` has carried this exact primitive for map files since v0.2, with the
+    reasoning spelled out: a plain ``write_text()`` killed mid-flush — OOM under swap
+    pressure, or Android's Phantom Process Killer — leaves a half-written file.
+
+    This module wrote the user's own CLAUDE.md with a bare ``write_text``, so the ONE file
+    in the whole design that is not regenerable was the one file without the guard. A
+    corrupt map costs a re-run; a truncated CLAUDE.md costs instructions the user wrote by
+    hand and cannot get back except from the `.bak` they have to know to look for. The
+    asymmetry ran the wrong way.
+
+    ``newline=""`` is deliberate: it stops Python re-writing every line ending in the file
+    on the round trip, which would otherwise turn a CRLF-authored CLAUDE.md into a
+    whole-file diff and quietly break the byte-identity promise this module makes.
+    """
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".ctxtmp-", suffix=path.suffix)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _timestamped_backup(path: Path) -> Optional[Path]:
     """Write a timestamped `.bak` copy of `path` (if it exists) and return its path."""
     if not path.exists():
@@ -149,7 +181,14 @@ def splice(
     `splice_changelog_entry` funnel through — the ONLY code path that ever
     writes bytes into a managed marker span.
     """
-    original = path.read_text() if path.exists() else ""
+    # Read with newline="" so the file's own line-ending convention survives the round trip.
+    # A CLAUDE.md authored on Windows is CRLF; read_text()'s universal-newline default turns
+    # it into LF in memory and writes LF back out, rewriting EVERY line in the file rather
+    # than the marker span. The byte-identity promise above would hold in the test suite
+    # (LF-only fixtures) and fail on the one file class that would notice.
+    raw = path.read_text(newline="") if path.exists() else ""
+    crlf = "\r\n" in raw
+    original = raw.replace("\r\n", "\n") if crlf else raw
     try:
         updated = replace_block(original, start_marker, end_marker, new_block)
     except MalformedMarkersError as exc:
@@ -162,7 +201,7 @@ def splice(
         return SpliceResult(path=path, backup_path=None, refused=False, reason=None, changed=True)
 
     backup_path = _timestamped_backup(path)
-    path.write_text(updated)
+    _atomic_write(path, updated.replace("\n", "\r\n") if crlf else updated)
     return SpliceResult(path=path, backup_path=backup_path, refused=False, reason=None, changed=True)
 
 
