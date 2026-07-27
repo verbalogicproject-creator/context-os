@@ -1,0 +1,1711 @@
+{
+  "lang": "python",
+  "scanner": "PythonScanner",
+  "root": "/root/projects/context-os",
+  "nodes": [
+    {
+      "name": "main.py",
+      "path": "demo/api/main.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 10,
+      "size_bytes": 149,
+      "auto": true,
+      "category": "",
+      "identity": "",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "create_app"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": [
+          "api"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "routes.py",
+      "path": "demo/api/routes.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 6,
+      "size_bytes": 155,
+      "auto": true,
+      "category": "",
+      "identity": "",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "register"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": [
+          "api"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "store.py",
+      "path": "demo/api/store.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 9,
+      "size_bytes": 192,
+      "auto": true,
+      "category": "",
+      "identity": "",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [
+          "Store"
+        ],
+        "top_level_fns": [],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "_common.py",
+      "path": "hooks/_common.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 57,
+      "size_bytes": 2021,
+      "auto": true,
+      "category": "",
+      "identity": "Shared bootstrap for context-os's two drift hooks.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [
+        "post_tool_use.py",
+        "pre_tool_use.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "bootstrap_import",
+          "read_hook_input",
+          "repo_root_from",
+          "tool_failed",
+          "emit"
+        ],
+        "imports_stdlib": [
+          "json",
+          "os",
+          "pathlib",
+          "sys"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "post_tool_use.py",
+      "path": "hooks/post_tool_use.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 60,
+      "size_bytes": 1769,
+      "auto": true,
+      "category": "",
+      "identity": "context-os PostToolUse \u2014 flip the owning map's staleness when source changes.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "_common.py",
+        "ctx_staleness.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "main"
+        ],
+        "imports_stdlib": [
+          "pathlib",
+          "sys"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "pre_tool_use.py",
+      "path": "hooks/pre_tool_use.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 88,
+      "size_bytes": 3783,
+      "auto": true,
+      "category": "",
+      "identity": "context-os PreToolUse \u2014 keep a map's drift flag honest, log map-vs-source use, gently nudge.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "_common.py",
+        "ctx_staleness.py",
+        "session_log.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_first_source_touch",
+          "main"
+        ],
+        "imports_stdlib": [
+          "pathlib",
+          "sys"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "audit.py",
+      "path": "scripts/audit.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 736,
+      "size_bytes": 29030,
+      "auto": true,
+      "category": "",
+      "identity": "The two load-bearing audits: derive-don't-fabricate, and augment-don't-clobber.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "claudemd_splice.py",
+        "measure.py",
+        "scan.py"
+      ],
+      "imported_by_engine": [
+        "measure.py",
+        "test_audit_ngf.py",
+        "test_cache_check.py",
+        "test_compress.py",
+        "test_measure.py",
+        "test_plan.py",
+        "test_savings_band.py"
+      ],
+      "_detected": {
+        "classes": [
+          "CtxNode",
+          "CtxEdge",
+          "FabricationFinding",
+          "FabricationAuditResult",
+          "SpliceSafetyResult",
+          "TokenReport"
+        ],
+        "top_level_fns": [
+          "extract_ctx_block",
+          "parse_ctx_file",
+          "_split_targets",
+          "check_derive_dont_fabricate",
+          "check_splice_byte_identity",
+          "_estimate_tokens",
+          "compute_token_report",
+          "find_map_files",
+          "_node_is_grounded",
+          "_edge_is_dangling",
+          "check_maps_fabrication",
+          "repair_targets",
+          "compute_maps_token_report",
+          "map_is_enriched",
+          "check_cache_stability",
+          "main",
+          "_print_fabrication",
+          "_print_tokens",
+          "_print_maps_tokens"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "dataclasses",
+          "json",
+          "pathlib",
+          "re",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "claudemd_splice.py",
+      "path": "scripts/claudemd_splice.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 318,
+      "size_bytes": 12998,
+      "auto": true,
+      "category": "",
+      "identity": "The ONLY tool allowed to mutate a managed CLAUDE.md block or the architecture.ctx changelog.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [
+        "audit.py",
+        "test_cache_check.py",
+        "test_splice.py"
+      ],
+      "_detected": {
+        "classes": [
+          "MalformedMarkersError",
+          "MarkerSpan",
+          "SpliceResult"
+        ],
+        "top_level_fns": [
+          "_find_markers",
+          "strip_block",
+          "replace_block",
+          "_timestamped_backup",
+          "splice",
+          "build_claudemd_block",
+          "splice_claudemd",
+          "build_changelog_block",
+          "_read_existing_changelog_entries",
+          "splice_changelog_entry",
+          "_report",
+          "main"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "dataclasses",
+          "datetime",
+          "pathlib",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "compress.py",
+      "path": "scripts/compress.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 121,
+      "size_bytes": 4187,
+      "auto": true,
+      "category": "",
+      "identity": "Content-aware compressed views for NON-code files.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [
+        "scan.py",
+        "test_compress.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "content_type",
+          "_compress_json",
+          "_compress_config",
+          "_compress_doc",
+          "_compress_data",
+          "_compress_log",
+          "compress_file"
+        ],
+        "imports_stdlib": [
+          "json",
+          "pathlib",
+          "re",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "ctx_staleness.py",
+      "path": "scripts/ctx_staleness.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 350,
+      "size_bytes": 12871,
+      "auto": true,
+      "category": "",
+      "identity": "Structural-hash drift detection for context-os maps. Stdlib only, offline.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [
+        "post_tool_use.py",
+        "pre_tool_use.py",
+        "session_log.py",
+        "snapshot.py",
+        "test_measure.py",
+        "test_staleness.py"
+      ],
+      "_detected": {
+        "classes": [
+          "MalformedFrontmatterError"
+        ],
+        "top_level_fns": [
+          "_atomic_write",
+          "signature",
+          "_frontmatter_close",
+          "fm_get",
+          "fm_set",
+          "_is_map_file",
+          "_map_name_for_dir",
+          "owning_map",
+          "stamp",
+          "flip",
+          "stamp_all",
+          "status_all",
+          "main"
+        ],
+        "imports_stdlib": [
+          "hashlib",
+          "os",
+          "pathlib",
+          "re",
+          "sys",
+          "tempfile",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "mcp_server.py",
+      "path": "scripts/mcp_server.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 140,
+      "size_bytes": 5157,
+      "auto": true,
+      "category": "",
+      "identity": "A tiny stdlib MCP server exposing context-os maps + CCR retrieve over stdio.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "retrieve.py"
+      ],
+      "imported_by_engine": [
+        "test_mcp.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_root",
+          "_map_path",
+          "call_tool",
+          "handle",
+          "main"
+        ],
+        "imports_stdlib": [
+          "json",
+          "os",
+          "pathlib",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "measure.py",
+      "path": "scripts/measure.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 228,
+      "size_bytes": 9951,
+      "auto": true,
+      "category": "",
+      "identity": "Measure what a session DELIVERED \u2014 map reads vs source re-reads \u2014 not artifact size.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "session_log.py"
+      ],
+      "imported_by_engine": [
+        "audit.py",
+        "test_measure.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_tok",
+          "summarize",
+          "format_report",
+          "_iter_tool_paths",
+          "summarize_transcript",
+          "catchup_targets",
+          "main"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "json",
+          "pathlib",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "plan.py",
+      "path": "scripts/plan.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 286,
+      "size_bytes": 11910,
+      "auto": true,
+      "category": "",
+      "identity": "Rank folders by architectural importance so /context-os maps what matters \u2014 not every folder.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "scan.py"
+      ],
+      "imported_by_engine": [
+        "test_plan.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_folder_of",
+          "_nearest_mapped_ancestor",
+          "_is_borderline",
+          "compute_plan",
+          "format_table",
+          "_map_file",
+          "_ctx_node_lines",
+          "_insert_before_ctx_close",
+          "_prune_index",
+          "apply_fold",
+          "main"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "json",
+          "pathlib",
+          "re",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "retrieve.py",
+      "path": "scripts/retrieve.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 337,
+      "size_bytes": 12703,
+      "auto": true,
+      "category": "",
+      "identity": "Retrieve the exact original source behind a context-os map reference \u2014 the CCR \"retrieve\".",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [
+        "mcp_server.py",
+        "test_retrieve.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_indent",
+          "_blank_literals",
+          "_bracket_span",
+          "_brace_body_start",
+          "_brace_span_from",
+          "_indent_span",
+          "_python_span_via_ast",
+          "_find_symbol_span",
+          "_split_anchor",
+          "retrieve",
+          "main"
+        ],
+        "imports_stdlib": [
+          "ast",
+          "hashlib",
+          "json",
+          "pathlib",
+          "re",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "scan.py",
+      "path": "scripts/scan.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 773,
+      "size_bytes": 30731,
+      "auto": true,
+      "category": "",
+      "identity": "Deterministic, whole-repo grounded skeleton scanner for ctx-architecture.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "compress.py"
+      ],
+      "imported_by_engine": [
+        "audit.py",
+        "plan.py",
+        "test_audit_ngf.py",
+        "test_compress.py",
+        "test_digest.py",
+        "test_measure.py",
+        "test_plan.py",
+        "test_scan_emit.py",
+        "test_scan_imports.py",
+        "test_staleness.py"
+      ],
+      "_detected": {
+        "classes": [
+          "ScanNode",
+          "ScanEdge",
+          "ScanResult"
+        ],
+        "top_level_fns": [
+          "parse_python_imports",
+          "parse_ts_imports",
+          "parse_go_imports",
+          "parse_rust_imports",
+          "parse_java_imports",
+          "infer_type",
+          "scan_project",
+          "scan_content",
+          "_match_by_suffix",
+          "resolve_import",
+          "write_ngf_skeletons",
+          "_leading_doc",
+          "file_digest",
+          "build_folder_digests",
+          "write_digests",
+          "scan",
+          "main"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "collections",
+          "dataclasses",
+          "datetime",
+          "json",
+          "os",
+          "pathlib",
+          "re",
+          "sys",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__",
+          "posixpath"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "session_log.py",
+      "path": "scripts/session_log.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 165,
+      "size_bytes": 6009,
+      "auto": true,
+      "category": "",
+      "identity": "Per-session read ledger \u2014 the behavioral ground truth for \"did the agent read the map?\".",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "ctx_staleness.py"
+      ],
+      "imported_by_engine": [
+        "measure.py",
+        "pre_tool_use.py",
+        "test_measure.py"
+      ],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "log_dir",
+          "_safe",
+          "ledger_path",
+          "_rel",
+          "classify",
+          "record_read",
+          "record_explore",
+          "reads",
+          "map_read_this_session",
+          "folder_touched_before",
+          "latest_session_id"
+        ],
+        "imports_stdlib": [
+          "json",
+          "pathlib",
+          "typing"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "snapshot.py",
+      "path": "scripts/snapshot.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 138,
+      "size_bytes": 5230,
+      "auto": true,
+      "category": "",
+      "identity": "Scaffold a portable session snapshot (`snapshot.ngf.md`) for cold-resume.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "ctx_staleness.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_git",
+          "git_state",
+          "map_hashes",
+          "scaffold",
+          "main"
+        ],
+        "imports_stdlib": [
+          "argparse",
+          "datetime",
+          "pathlib",
+          "subprocess",
+          "sys"
+        ],
+        "imports_third_party": [
+          "__future__"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "conftest.py",
+      "path": "tests/conftest.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 8,
+      "size_bytes": 301,
+      "auto": true,
+      "category": "",
+      "identity": "Put `scripts/` on sys.path so tests import scan / audit / claudemd_splice / ctx_staleness",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [],
+        "imports_stdlib": [
+          "pathlib",
+          "sys"
+        ],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_audit_ngf.py",
+      "path": "tests/test_audit_ngf.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 93,
+      "size_bytes": 3130,
+      "auto": true,
+      "category": "",
+      "identity": "The .ngf.md-aware parser + whole-map fabrication audit (derive-don't-fabricate).",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_extract_ctx_block_pulls_only_the_block",
+          "test_extract_ctx_block_passes_through_bare_ctx",
+          "_emit",
+          "test_parse_map_reads_nodes_from_block",
+          "test_check_maps_fabrication_passes_on_grounded_maps",
+          "test_check_maps_fabrication_catches_an_invented_node",
+          "test_savings_report_is_computable",
+          "test_edge_advisory_flags_dangling_target_without_failing",
+          "test_repair_targets_empty_on_clean_maps",
+          "test_repair_targets_flags_folder_with_fabricated_node",
+          "test_repair_targets_flags_folder_with_dangling_edge"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_cache_check.py",
+      "path": "tests/test_cache_check.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 34,
+      "size_bytes": 1171,
+      "auto": true,
+      "category": "",
+      "identity": "Cache-stability hygiene: the pointer block must stay volatile-free and byte-stable.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "claudemd_splice.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_clean_pointer_block_passes",
+          "test_volatile_content_is_flagged",
+          "test_pointer_block_is_byte_stable"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_compress.py",
+      "path": "tests/test_compress.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 62,
+      "size_bytes": 2354,
+      "auto": true,
+      "category": "",
+      "identity": "Content-aware compression for non-code files, and its integration into the scan/emit.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "compress.py",
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_json_config_view",
+          "test_markdown_doc_view",
+          "test_csv_data_view",
+          "test_log_view",
+          "test_non_code_folder_gets_a_map_node",
+          "test_content_node_bracket_safe"
+        ],
+        "imports_stdlib": [
+          "pathlib"
+        ],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_digest.py",
+      "path": "tests/test_digest.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 31,
+      "size_bytes": 1047,
+      "auto": true,
+      "category": "",
+      "identity": "Per-folder structural digests (cheap enrichment input for map-enricher).",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_file_digest_captures_doc_and_declarations",
+          "test_write_digests_creates_per_folder_files"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_mcp.py",
+      "path": "tests/test_mcp.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 57,
+      "size_bytes": 2585,
+      "auto": true,
+      "category": "",
+      "identity": "The stdlib MCP server: JSON-RPC handshake + the contextos_map / contextos_retrieve tools.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "mcp_server.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_initialize_and_tools_list",
+          "test_retrieve_tool",
+          "test_map_tool",
+          "test_stdio_round_trip"
+        ],
+        "imports_stdlib": [
+          "json",
+          "pathlib",
+          "subprocess",
+          "sys"
+        ],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_measure.py",
+      "path": "tests/test_measure.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 119,
+      "size_bytes": 4953,
+      "auto": true,
+      "category": "",
+      "identity": "The per-session read ledger + delivered-savings measurement (behavioral, not artifact size).",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "ctx_staleness.py",
+        "measure.py",
+        "scan.py",
+        "session_log.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_mapped_repo",
+          "test_classify_map_and_source",
+          "test_source_without_map_is_unmapped",
+          "test_source_read_without_map_read_scores_zero_consultation",
+          "test_reading_the_map_counts_as_consulted",
+          "test_explore_logged_only_for_mapped_folders",
+          "test_other_reads_are_not_logged",
+          "test_latest_session_id",
+          "test_corrupt_ledger_line_is_skipped",
+          "test_map_is_enriched_detects_skeleton_vs_enriched",
+          "test_catchup_targets_lists_touched_skeleton_folders",
+          "test_catchup_ignores_untouched_folders",
+          "test_transcript_best_effort_counts_a_source_read"
+        ],
+        "imports_stdlib": [
+          "json"
+        ],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_plan.py",
+      "path": "tests/test_plan.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 98,
+      "size_bytes": 4323,
+      "auto": true,
+      "category": "",
+      "identity": "Deterministic folder ranking (DEEP / SKELETON / FOLD) from the scan graph.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py",
+        "plan.py",
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_row",
+          "_build",
+          "test_hub_is_deep_thin_entry_is_borderline_skeleton",
+          "test_peripheral_code_is_skeleton",
+          "test_content_folder_folds_into_parent",
+          "test_borderline_folder_is_flagged",
+          "test_summary_counts_and_selectivity",
+          "test_apply_fold_merges_content_into_parent"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_retrieve.py",
+      "path": "tests/test_retrieve.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 130,
+      "size_bytes": 4962,
+      "auto": true,
+      "category": "",
+      "identity": "CCR retrieve: resolve a path[:symbol] anchor to the exact original block + a content hash.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "retrieve.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_retrieve_python_symbol_block",
+          "test_retrieve_brace_language_block",
+          "test_retrieve_whole_file_when_no_symbol",
+          "test_unknown_symbol_falls_back_to_whole_file",
+          "test_hash_changes_when_block_changes",
+          "test_missing_file_errors",
+          "test_python_multiline_signature_not_truncated",
+          "test_python_includes_decorators",
+          "test_python_multiline_assignment",
+          "test_ts_multiline_signature_not_truncated",
+          "test_ts_object_default_param",
+          "test_js_string_embedded_brace",
+          "test_low_confidence_on_unbalanced_braces"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_savings_band.py",
+      "path": "tests/test_savings_band.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 25,
+      "size_bytes": 946,
+      "auto": true,
+      "category": "",
+      "identity": "Pin the headline compression number so a refactor can't silently tank (or inflate) it.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "audit.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_demo_ceiling_within_expected_band",
+          "test_demo_maps_are_smaller_than_source"
+        ],
+        "imports_stdlib": [
+          "pathlib"
+        ],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_scan_emit.py",
+      "path": "tests/test_scan_emit.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 58,
+      "size_bytes": 2020,
+      "auto": true,
+      "category": "",
+      "identity": "The per-folder .ngf.md emit: valid maps + index, collision-safe names, skip-existing.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_make_project",
+          "test_emit_creates_maps_and_index",
+          "test_skeleton_skips_existing",
+          "test_stem_collision_names_are_repo_unique"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_scan_imports.py",
+      "path": "tests/test_scan_imports.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 35,
+      "size_bytes": 1310,
+      "auto": true,
+      "category": "",
+      "identity": "Import resolution: Python relative-dotted imports and indented imports resolve to edges.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_edges",
+          "test_relative_dotted_import_same_package",
+          "test_relative_dotted_import_parent_package",
+          "test_indented_import_is_captured"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_splice.py",
+      "path": "tests/test_splice.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 55,
+      "size_bytes": 1769,
+      "auto": true,
+      "category": "",
+      "identity": "The pointer-block splice: augment-don't-clobber \u2014 preserve, idempotent, refuse-on-malformed.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "claudemd_splice.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "test_splice_appends_and_preserves_existing",
+          "test_splice_into_fresh_file",
+          "test_splice_is_idempotent",
+          "test_refuse_on_malformed_markers",
+          "test_byte_identity_outside_the_block",
+          "test_pointer_block_stops_the_explore_reflex"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": []
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    },
+    {
+      "name": "test_staleness.py",
+      "path": "tests/test_staleness.py",
+      "kind": "file",
+      "lang": "python",
+      "lines": 110,
+      "size_bytes": 4078,
+      "auto": true,
+      "category": "",
+      "identity": "The structural-hash drift engine: semantic (not temporal) change detection + frontmatter I/O.",
+      "mechanism": "",
+      "state": {
+        "db_tables_read": [],
+        "db_tables_write": [],
+        "mqtt": "",
+        "subprocess": [],
+        "external_apis": []
+      },
+      "imports_from_engine": [
+        "ctx_staleness.py",
+        "scan.py"
+      ],
+      "imported_by_engine": [],
+      "_detected": {
+        "classes": [],
+        "top_level_fns": [
+          "_setup",
+          "test_stamp_writes_baseline_and_verified",
+          "test_whitespace_and_comments_do_not_drift",
+          "test_new_import_drifts",
+          "test_new_file_drifts",
+          "test_unstamped_when_no_baseline",
+          "test_owning_map_resolves_source_and_self",
+          "test_frontmatter_set_get_roundtrip",
+          "test_frontmatter_set_refuses_without_frontmatter",
+          "test_stamp_raises_on_malformed_frontmatter",
+          "test_flip_reports_unreadable_frontmatter",
+          "test_bom_frontmatter_is_tolerated",
+          "test_stamp_leaves_no_temp_files",
+          "test_stamp_all_reports_failures"
+        ],
+        "imports_stdlib": [],
+        "imports_third_party": [
+          "pytest"
+        ]
+      },
+      "upgrade_vector": {
+        "source": "no_documented_next_move",
+        "ref": "",
+        "text": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "post_tool_use.py",
+      "to": "_common.py",
+      "kind": "imports"
+    },
+    {
+      "from": "post_tool_use.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "pre_tool_use.py",
+      "to": "_common.py",
+      "kind": "imports"
+    },
+    {
+      "from": "pre_tool_use.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "pre_tool_use.py",
+      "to": "session_log.py",
+      "kind": "imports"
+    },
+    {
+      "from": "audit.py",
+      "to": "claudemd_splice.py",
+      "kind": "imports"
+    },
+    {
+      "from": "audit.py",
+      "to": "measure.py",
+      "kind": "imports"
+    },
+    {
+      "from": "audit.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "mcp_server.py",
+      "to": "retrieve.py",
+      "kind": "imports"
+    },
+    {
+      "from": "measure.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "measure.py",
+      "to": "session_log.py",
+      "kind": "imports"
+    },
+    {
+      "from": "plan.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "scan.py",
+      "to": "compress.py",
+      "kind": "imports"
+    },
+    {
+      "from": "session_log.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "snapshot.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_audit_ngf.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_audit_ngf.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_cache_check.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_cache_check.py",
+      "to": "claudemd_splice.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_compress.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_compress.py",
+      "to": "compress.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_compress.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_digest.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_mcp.py",
+      "to": "mcp_server.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_measure.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_measure.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_measure.py",
+      "to": "measure.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_measure.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_measure.py",
+      "to": "session_log.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_plan.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_plan.py",
+      "to": "plan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_plan.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_retrieve.py",
+      "to": "retrieve.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_savings_band.py",
+      "to": "audit.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_scan_emit.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_scan_imports.py",
+      "to": "scan.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_splice.py",
+      "to": "claudemd_splice.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_staleness.py",
+      "to": "ctx_staleness.py",
+      "kind": "imports"
+    },
+    {
+      "from": "test_staleness.py",
+      "to": "scan.py",
+      "kind": "imports"
+    }
+  ],
+  "generated_at": "2026-07-27",
+  "scanner_version": "0.1.0"
+}
