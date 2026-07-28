@@ -5,6 +5,12 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-28
+
+The meter release. Everything below was measured on this cycle rather than reasoned about,
+and two of the three headline changes are a rule being *withdrawn* because the measurement
+refuted it.
+
 ### Changed
 - **Merging code folders is OFF by default — it measured negative.** The rule below shipped
   earlier in this cycle and was measured within the hour: on a real 17-folder project it cut the
