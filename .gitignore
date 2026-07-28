@@ -35,3 +35,7 @@ reference/
 
 # context-os per-session read ledger (local telemetry, not shipped)
 .context-os/reads-*.jsonl
+
+# Session relay (local by default — it carries conversation state, so it is far likelier to
+# hold something private than a map is; committing one stays a deliberate, per-case choice)
+.context-os/relay.ngf.md

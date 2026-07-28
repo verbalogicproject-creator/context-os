@@ -12,9 +12,11 @@ example of its output, see `demo/`, which carries real, committed maps.)
   repair loop → fold content into parents; `--skeleton` skips enrichment, `--premium` runs Sonnet,
   `--all` enriches every folder. `/context-os-catchup` is the **lazy** path: after a `--skeleton`
   pass, it enriches only the folders the session's read ledger shows you touched.
-- `agents/*.md` — `map-enricher` (enriches ONE folder's map, `model: haiku`) and `map-updater`
-  (drift-only refresh, `model: sonnet`). (The old monolithic `map-scout` was retired in v0.2 —
-  its work is split between the command orchestrator and the per-folder `map-enricher`.)
+- `agents/*.md` — `map-enricher` (enriches ONE folder's map, `model: haiku`), `map-updater`
+  (drift-only refresh, `model: sonnet`), and `relay-cold-reader` (reads ONE handoff file and
+  nothing else, and scores whether a cold session could resume from it, `model: sonnet`).
+  (The old monolithic `map-scout` was retired in v0.2 — its work is split between the command
+  orchestrator and the per-folder `map-enricher`.)
 - `hooks/` — `hooks.json` + `pre_tool_use.py` / `post_tool_use.py` / `_common.py`: the
   drift hooks that keep each map's `staleness` flag honest.
 - `scripts/` — stdlib-only, offline:
@@ -35,6 +37,12 @@ example of its output, see `demo/`, which carries real, committed maps.)
   - `measure.py` — turns that ledger into the DELIVERED number (map-consultation rate); a
     best-effort `transcript` mode reads Claude Code's own session `.jsonl`.
   - `snapshot.py` — the mechanical scaffolder for `/snapshot`.
+  - `relay.py` — the mechanical half of a cold-start handoff (`.context-os/relay.ngf.md`,
+    gitignored): `capture` (git state + map hashes + touched folders + the context prefix,
+    with every authored slot emitted as a literal `TODO(relay):` line), `budget` (a
+    16,000-CHARACTER ceiling; fails while any slot outside a fence is unfilled), `prefix`
+    (current context size, from a bounded tail of the session transcript — never the whole
+    file). A relay supersedes `snapshot` and reuses its `git_state`/`map_hashes`.
   - `retrieve.py` — CCR: resolve a `path[:symbol]` anchor to the exact original block + hash
     (ast-exact for Python; literal-aware best-effort elsewhere, with a `low_confidence` flag).
   - `compress.py` — content-aware compressed views for non-code files (config/doc/data/log).

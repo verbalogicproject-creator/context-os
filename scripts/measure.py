@@ -271,6 +271,23 @@ def format_cost(profile: dict) -> str:
     return "\n".join(lines)
 
 
+def touched_owners(root: Path, session_id: str) -> set:
+    """The maps this session touched — read directly, or owning a source/explore entry.
+
+    The fold from ledger entries up to owning maps. Shared, because "which folders did this
+    session actually work in" is asked by more than one caller (`/context-os-catchup` and
+    `relay.py`), and two copies of it would drift.
+    """
+    owners = set()
+    for entry in session_log.reads(root, session_id):
+        kind = entry.get("kind")
+        if kind in (session_log.KIND_SOURCE_MAPPED, session_log.KIND_EXPLORE) and entry.get("owner"):
+            owners.add(entry["owner"])
+        elif kind == session_log.KIND_MAP and entry.get("path"):
+            owners.add(entry["path"])
+    return owners
+
+
 def catchup_targets(root: Path, session_id: str) -> List[str]:
     """Folders touched this session whose map is still skeleton-only (unenriched).
 
@@ -280,13 +297,7 @@ def catchup_targets(root: Path, session_id: str) -> List[str]:
     """
     import audit  # local: only the catch-up path needs the enrichment check
 
-    owners = set()
-    for entry in session_log.reads(root, session_id):
-        kind = entry.get("kind")
-        if kind in (session_log.KIND_SOURCE_MAPPED, session_log.KIND_EXPLORE) and entry.get("owner"):
-            owners.add(entry["owner"])
-        elif kind == session_log.KIND_MAP and entry.get("path"):
-            owners.add(entry["path"])
+    owners = touched_owners(root, session_id)
 
     targets = []
     for owner_rel in owners:

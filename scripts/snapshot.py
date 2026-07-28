@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ctx_staleness import fm_get  # noqa: E402  (reuse the frontmatter reader)
+from ctx_staleness import _atomic_write, fm_get  # noqa: E402  (reuse fm + the atomic write)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -69,7 +69,9 @@ def scaffold(root: Path, goal: str, now: str):
         archive_dir.mkdir(parents=True, exist_ok=True)
         stamp = now.replace(":", "").replace("-", "")
         archived = archive_dir / f"{stamp}.ngf.md"
-        archived.write_text(snap.read_text())
+        # Same defect class as the write below: a torn copy here loses the only record of
+        # the previous snapshot, which the new one is about to replace.
+        _atomic_write(archived, snap.read_text())
 
     g = git_state(root)
     lines = [
@@ -111,7 +113,7 @@ def scaffold(root: Path, goal: str, now: str):
         "```",
         "",
     ]
-    snap.write_text("\n".join(lines))
+    _atomic_write(snap, "\n".join(lines))
     return snap, archived
 
 
