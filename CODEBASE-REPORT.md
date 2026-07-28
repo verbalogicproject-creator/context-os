@@ -9,14 +9,14 @@ these rules see `CLAUDE.md`; for the file format see `SPEC.md`; for what's plann
 
 | Fact | Value | How to check it yourself |
 |---|---|---|
-| Version | `0.5.0` | `.claude-plugin/plugin.json` → `version` |
+| Version | `0.6.0` | `.claude-plugin/plugin.json` → `version` |
 | License | Apache-2.0, Eyal Nof sole author | `LICENSE`, `NOTICE` |
-| Python files (repo, excl. caches) | 36 | `find . -name '*.py' -not -path './.pytest_cache/*' -not -path '*/__pycache__/*' \| wc -l` |
-| `scripts/` — lines | 12 files, 4,139 lines | `wc -l scripts/*.py` |
+| Python files (repo, excl. caches) | 38 | `find . -name '*.py' -not -path './.pytest_cache/*' -not -path '*/__pycache__/*' \| wc -l` |
+| `scripts/` — lines | 13 files, 4,605 lines | `wc -l scripts/*.py` |
 | `hooks/` — lines | 3 files, 202 lines | `wc -l hooks/*.py` |
-| Tests | 126 passing, 17 test files + `conftest.py` | `python3 -m pytest tests/ -q` |
-| Slash commands | 5 (`commands/*.md`) | `ls commands/` |
-| Agents | 2 (`agents/*.md`) | `ls agents/` |
+| Tests | 157 passing, 18 test files + `conftest.py` | `python3 -m pytest tests/ -q` |
+| Slash commands | 6 (`commands/*.md`) | `ls commands/` |
+| Agents | 3 (`agents/*.md`) | `ls agents/` |
 | MCP tools | 2 (`contextos_map`, `contextos_retrieve`) | `.mcp.json` + `scripts/mcp_server.py` |
 | Demo | 2 folders, 5 source files (`api/` ×3 Python, `web/` ×2 TypeScript) | `find demo -name '*.py' -o -name '*.ts'` |
 
@@ -170,6 +170,7 @@ imports (an internal edge — not a claim about what the *target project's* code
 | `measure.py` | 391 | Turns the session read ledger into the **delivered** number, plus `cost` — the REAL per-turn usage from a Claude Code `.jsonl` (not a bytes/4 estimate), with `context_tax()` pricing what admitting N tokens at turn T costs over the rest of the session. `session` (map-consultation rate for one session), `catchup` (touched-but-still-skeleton folders — the `/context-os-catchup` set), `transcript` (best-effort read count from Claude Code's own `.jsonl`). | `audit.py`, `session_log.py` | `audit.py`, `test_measure.py` |
 | `session_log.py` | 164 | The per-session read ledger (`.context-os/reads-<session>.jsonl`, gitignored): classifies each Read/Grep/Glob as a map read, a source read in a mapped folder, or an explore over a mapped folder — the behavioral ground truth `measure.py` reports on. | `ctx_staleness.py` | `measure.py`, `pre_tool_use.py`, `test_measure.py` |
 | `snapshot.py` | 137 | Mechanical scaffolder for `/snapshot`: records git state + every map's `structural_hash`/`staleness` at capture, archives the previous snapshot under `.context-os/snapshots/`, writes a `## summary` + work-state `ctx` block scaffold for the agent to fill in (the agent — not this script — writes the actual narrative). | `ctx_staleness.py` | (none — leaf) |
+| `relay.py` | 453 | The mechanical half of `/relay`'s cold-start handoff: `capture` writes `.context-os/relay.ngf.md` — git state + map hashes (reused from `snapshot.py`), the folders the session touched (the ledger owner-fold), and the current context prefix — and emits every AUTHORED slot as a literal `TODO(relay):` placeholder, since a value this script invented would read as if a session had checked it. `budget` enforces a 16,000-CHARACTER ceiling (exact, no tokeniser) and fails while any placeholder sits outside a fenced block. `prefix` seeks a bounded tail of the session transcript (0.41 s on 53 MB — never a full read). `gate` parses the cold reader's `SCORE:`/`ISOLATION:` trailer; an unparseable verdict is a failed run, never a pass. | `ctx_staleness.py`, `measure.py`, `session_log.py`, `snapshot.py` | `test_relay.py` |
 | `mcp_server.py` | 149 | A stdlib stdio JSON-RPC server exposing `contextos_map(folder?, root?)` and `contextos_retrieve(anchor, root?)` as MCP tools, wired by `.mcp.json`. | `retrieve.py` | `test_mcp.py` |
 
 **Note — found by this report, since fixed:** `scripts/mcp_server.py` reported
@@ -198,6 +199,7 @@ break a tool call), and speak only via `systemMessage` (informational), never `p
 | `/context-os-catchup` | `measure.py catchup` → N× `map-enricher` for the touched-and-still-skeleton set → repair loop → `stamp-all`/`check` | same as above | maps only (no new folders) |
 | `/context-os-update` | the `map-updater` agent | Sonnet | drifted maps only, `index.ngf.md` if shape changed |
 | `/context-os-status` | `ctx_staleness.py status` + `audit.py savings`/`check`/`session-savings` | — | nothing (read-only) |
+| `/relay` | `relay.py capture` → the **main session itself** fills the authored half → `relay.py budget` → a `relay-cold-reader` agent scores it → `relay.py gate` | Sonnet (the reader only; the authored half must run in the main session) | `.context-os/relay.ngf.md` (gitignored) |
 | `/snapshot` | `snapshot.py scaffold`, then the **main session itself** fills in the summary | — (must run in the main session, not a subagent) | `snapshot.ngf.md`, archives the prior one |
 
 ## Agents (`agents/*.md`)
@@ -206,6 +208,7 @@ break a tool call), and speak only via `systemMessage` (informational), never `p
 |---|---|---|---|
 | `map-enricher` | `haiku` (default), `sonnet` under `--premium` | Exactly ONE folder's map, isolated context (so a whole-repo run fans many out in parallel, cheaply) | **Derive, never fabricate** — every description, edge, and risk it writes must trace to a file or digest it actually read. Never renames a node, never touches another folder's map, never stamps/splices/audits. |
 | `map-updater` | `sonnet` | Only the maps `ctx_staleness.py status` reports `DRIFTED`; diffs against a fresh scan rather than re-authoring | **Report removals** — never silently drops a node; if a node's file is gone, it says so by name in its report. |
+| `relay-cold-reader` | `sonnet` | Exactly ONE file — the relay under test. May not grep, glob, or open anything the relay points at | **Wanting to open something else IS the finding** — it means the relay failed to carry it. Must disclose any file the harness injected unrequested, which makes the score provisional rather than clean. |
 
 `map-enricher`'s grounding rule is the core invariant of the whole enrichment path: the
 `audit.py check` gate mechanically proves every node traces to a real file, but the discipline
@@ -261,8 +264,8 @@ Total: **83 tests**, run with `python3 -m pytest tests/ -q` — all green as of 
 
 ## Known gaps (see `ROADMAP.md` for the full, current list)
 
-- `scripts/mcp_server.py`'s hardcoded `version: "0.3.0"` is stale against `plugin.json`'s
-  `0.5.0` (noted above — cosmetic, not a protocol issue).
+- The plugin version is duplicated in `scripts/mcp_server.py` with nothing keeping the two in
+  sync. They agree today (both `0.6.0`); they drifted once already, and will again.
 - Git integration (drift narrowed by `git diff`, git hooks, a CI auto-regenerate workflow),
   a Merkle-tree structural hash, and `/snapshot` ↔ `git stash create`/`git bundle` are
   researched and scoped in `ROADMAP.md` but **not built** — do not describe them as shipped.

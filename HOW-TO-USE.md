@@ -9,11 +9,11 @@ the file format's technical spec, see **`SPEC.md`**.
 
 1. [What context-os is (the 2-minute version)](#1-what-context-os-is)
 2. [Your first run](#2-your-first-run)
-3. [The five commands](#3-the-five-commands)
+3. [The six commands](#3-the-six-commands)
 4. [How to read a map](#4-how-to-read-a-map)
 5. [The daily workflow — drift](#5-the-daily-workflow--drift)
 6. [Committing maps to git](#6-committing-maps-to-git)
-7. [Stopping and resuming — /snapshot](#7-stopping-and-resuming--snapshot)
+7. [Stopping and resuming — /relay](#7-stopping-and-resuming--relay)
 8. [Privacy & security](#8-privacy--security)
 9. [FAQ](#9-faq)
 10. [Troubleshooting](#10-troubleshooting)
@@ -75,7 +75,7 @@ Start `--skeleton`, upgrade when you want the prose.
 
 ---
 
-## 3. The five commands
+## 3. The six commands
 
 | Command | What it does | When to run it |
 |---|---|---|
@@ -83,7 +83,8 @@ Start `--skeleton`, upgrade when you want the prose.
 | **`/context-os-catchup`** | Enrich only the folders you actually worked in this session (the lazy companion to a `--skeleton` pass). | After `/context-os --skeleton`, any time you've touched a few folders and want them described. |
 | **`/context-os-update`** | Refresh **only** the folders whose code drifted since their map was verified. Reports every node it removes, by name. | When `/context-os-status` shows drift. Optionally scoped: `/context-os-update src/api`. |
 | **`/context-os-status`** | Read-only. Lists each map as `verified` or `DRIFTED`, and the current token-save. Changes nothing. | Anytime you want to know if the maps are current. |
-| **`/snapshot`** | Capture the current session — a summary + the work-state — into one portable file for cold resume. | Before you stop, switch machines, or hand off to another model. See §7. |
+| **`/relay`** | Write the handoff for the next session — the one next action, what done looks like, what not to redo — then have a fresh reader check it can be resumed from. | Before you stop, switch machines, or hand off to another model. See §7. |
+| **`/snapshot`** | The older, narrative-shaped capture that `/relay` replaces. Still available. | Prefer `/relay`. See §7. |
 
 ---
 
@@ -190,24 +191,41 @@ GitHub/GitLab then collapse these in pull-request diffs (still expandable).
 
 ---
 
-## 7. Stopping and resuming — /snapshot
+## 7. Stopping and resuming — /relay
 
-`/snapshot` writes `snapshot.ngf.md`: a portable record of *where you are*, so you can stop
-now and pick up cold later — on another machine, or with another AI model.
+`/relay` writes `.context-os/relay.ngf.md`: one page a fresh session can start from, so you
+can stop now and pick up cold later — on another machine, or with another AI model.
 
 It contains:
-- a **compacted summary** of the session (what was discussed, decided, tried, and why);
-- the **work-state** — decisions, what's built, open questions, and the next steps, with
-  `file:symbol` pointers into the code;
-- the **git state** and each map's hash **at capture** (so a later session can tell if the
-  code moved since).
+- the **one next action** — a single concrete thing, phrased as a command or an edit to a
+  named file, not a theme;
+- **what "done" looks like** for it, as numbered criteria someone else could check;
+- the **decisions already settled** (with why), and **what not to redo** (with why);
+- the **open questions**, each with what it blocks;
+- **verification commands with their expected output**, and the real paths to reuse;
+- the **git state**, each map's hash **at capture**, the folders you touched, and the size
+  of the context you were carrying.
 
-To resume: copy the repo + `snapshot.ngf.md` to the other machine (or just open a new
-session), and tell the agent to read `snapshot.ngf.md`. It reads the summary, the
-work-state, and the maps it points to — and continues, without you re-explaining anything.
+Everything in that last group the tool fills in itself, from your repo and your session.
+The rest is yours to write — a script can't know why you stopped — so it leaves a marked
+placeholder for each piece, and the size check fails while any placeholder is still there.
 
-Each `/snapshot` archives the previous one under `.context-os/snapshots/`, so they're
-versioned, not overwritten. Snapshots are point-in-time — they don't drift, they just age.
+**Then it checks the file is usable.** The relay goes to a reader that knows nothing about
+your project and may open *nothing else* — not even the files the relay points at. It
+answers five questions (what's the next action? what would I open first? what must I not
+redo? what's missing? how confident am I?) and scores 0-10. **Below 8, you fix the relay
+before the session ends** — a handoff can only be repaired while the context that would
+repair it still exists. In testing a real relay scored 8/10, a deliberately gutted one 2/10.
+
+To resume: copy the repo + the relay to the other machine (or just open a new session), and
+tell the agent to read it. It continues without you re-explaining anything.
+
+A relay stays **local by default** — it carries session state, so it's likelier to hold
+something private than a map is. Committing one is a deliberate choice, never automatic.
+
+`/snapshot` still writes the older `snapshot.ngf.md` — a compacted narrative plus the
+work-state, archived under `.context-os/snapshots/` on each run. `/relay` supersedes it: a
+next action beats a summary, and a summary was never checked.
 
 ---
 

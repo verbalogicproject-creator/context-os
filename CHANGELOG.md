@@ -5,6 +5,68 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-28
+
+Two things a session could not do before: leave a handoff the next one can actually start from,
+and know what its context is really costing. Plus the security work — maps are meant to be
+committed, so what can reach one is now enforced in code rather than left to review.
+
+### Added
+- **`/relay` — the handoff you write before a session ends.** One page: the single next action,
+  what "done" looks like, the decisions already settled, what not to redo, and the real paths to
+  reuse. A fresh session reads it and picks the work straight up — on another machine, or in
+  Codex or Gemini. It replaces `/snapshot`, which was built around a narrative rather than a
+  next action.
+- **The cold-read check, and it blocks.** The last step of `/relay` sends the file to a reader
+  with no prior knowledge of the project (`relay-cold-reader`), which reads *only* that file and
+  scores 0-10 whether it could resume from it. Below 8/10 you fix the relay before the session
+  ends — because a handoff can only be repaired while the context that would repair it still
+  exists. Measured in both directions: a real relay scored 8/10, a deliberately gutted one 2/10.
+- **`scripts/relay.py`** — `capture` (writes everything a script can establish: git state, map
+  hashes, folders touched, current context size — and leaves every judgement to you as a marked
+  placeholder), `budget` (a 16,000-character ceiling, and fails while any placeholder remains),
+  `prefix` (current context size, read from a bounded tail of the session log — never the whole
+  file, which runs to tens of megabytes), `gate` (reads the cold reader's verdict).
+- **`measure.py cost <transcript.jsonl>`** — real token usage, reported by the API, instead of a
+  bytes/4 estimate. Across three real sessions (5,328 / 2,262 / 1,325 turns): re-reading the
+  conversation so far was **61-73%** of all cost, output 14-25%, first-sight-of-new-content
+  10-15%, fresh input ~0.02%. Exits 1 with a message when a log carries no usage data, rather
+  than printing a confident zero.
+- **`scripts/gitignore.py`** — the scanner now honours your `.gitignore`, in-process. Deliberately
+  not a shell-out to `git check-ignore`: map contents must not depend on whether git is installed.
+- **`docs/` chapters and `CODEBASE-REPORT.md`** — README had linked both since v0.5.0 without
+  either being present.
+
+### Changed
+- **The saving is described honestly as a whole-session effect, not a startup one.** Reading a
+  file is not charged once: everything already in the conversation is re-processed on every
+  message after it. On a 5,328-message session, reading 30,000 tokens of source at message 100
+  cost 524x its apparent size. So swapping a source read for a map read does not save you once —
+  it saves you on every message that follows.
+- **`SECURITY.md` states what the code enforces**, each guarantee pointing at the test that pins
+  it, and names the residual risks instead of omitting them. The old policy handed the one real
+  risk back to the user as "review it before you rely on it" — advice this tool's audience, by
+  design, will not take.
+- `snapshot.py` writes through the atomic helper, like every other map write.
+
+### Fixed
+- **A secret could reach a committed map.** `.env` was treated as an ordinary config file, so its
+  key names were listed into a map; the log compressor appended 80 verbatim characters of a real
+  error line, which is exactly where passwords in connection strings and tokens in URLs surface.
+  The whole `.env` family is now dropped by name, and logs report severity kinds only.
+- **A map could carry an instruction.** The enricher is a model reading arbitrary repo content,
+  and every session reads maps *before* source — so prose surviving from a hostile README into a
+  map description would act as a command, first, every session. `audit.py check` now fails on it,
+  tuned for precision so ordinary architecture prose still passes.
+- **Any readable file was fetchable over MCP.** `path` joins were unscoped, and `.mcp.json`
+  registers the server by default. Both call sites now go through a containment check that
+  returns a plain "not found", so a probe learns nothing.
+- **The one file that is not regenerable was written without the atomic guard** — your CLAUDE.md.
+  It also reads and writes with newlines preserved, so a CRLF-authored file no longer comes back
+  as a whole-file diff.
+- `ctx_staleness.py`'s usage banner omitted `status`, a working subcommand the docs and the CI
+  block both use; the MCP server advertised v0.3.0 while the plugin was at 0.5.0.
+
 ## [0.5.0] — 2026-07-23
 
 Lazy / on-demand mapping. Even mapping only the strategic folders pays for folders a given session

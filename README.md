@@ -133,7 +133,7 @@ that's already enriched. So you pay for the handful of folders you worked in, no
 /context-os-catchup         # enrich just those folders, on demand
 ```
 
-## The five commands
+## The six commands
 
 | Command | What it does |
 |---|---|
@@ -141,7 +141,8 @@ that's already enriched. So you pay for the handful of folders you worked in, no
 | `/context-os-catchup` | Enrich only the folders you actually worked in this session (the lazy companion to a `--skeleton` pass). |
 | `/context-os-update` | Refresh only the folders whose code drifted since their map was last verified. |
 | `/context-os-status` | Read-only: which maps are current vs `DRIFTED`, and the current token-save. |
-| `/snapshot` | Capture this session — a compacted summary + the work-state — into one portable file so you can resume cold on another machine or model. |
+| `/relay` | Write the handoff before you stop — the one next action, what done looks like, what not to redo — then have a fresh reader check it can actually be resumed from. |
+| `/snapshot` | The older, narrative-shaped capture that `/relay` replaces. Still here; prefer `/relay`. |
 
 ## How it stays honest
 
@@ -158,13 +159,27 @@ map file*, so any tool sees it — no hook required on the reader's side. The pr
 "always fresh," it's **never lies**: a `DRIFTED` map tells you to trust that one folder
 loosely and check the source.
 
-## Resuming cold — `/snapshot`
+## Resuming cold — `/relay`
 
-`/snapshot` writes `snapshot.ngf.md`: a compacted summary of the session, the current
-work-state (decisions, artifacts, open questions, next steps, with `file:symbol`
-pointers), the git state, and each map's hash at capture. Copy the repo + that file to a
-clean machine, hand a fresh session (Claude, Codex, whatever) the snapshot, and it
-continues from where you stopped — no prior coordination.
+`/relay` writes one page a fresh session can start from: the **single next action**, what
+*done* looks like for it, the decisions already settled and why, what not to redo, and the
+real paths to reuse. Everything a script can establish — git state, each map's hash at
+capture, the folders you touched, the current context size — it fills in itself; the
+judgement is yours, and it leaves a marked placeholder for each piece until you write it.
+
+**Then it checks the file can actually be used.** The last step hands the relay to a reader
+that has no knowledge of your project and is allowed to open *nothing else* — not even the
+files the relay points at. It answers five questions (what is the next action? what would I
+open? what must I not redo? what is missing?) and scores 0-10. Below 8, you fix the relay
+before the session ends — because a handoff can only be repaired while the context that
+would repair it still exists. In testing, a real relay scored 8/10 and a deliberately gutted
+one scored 2/10.
+
+Copy the repo + that file to a clean machine, hand a fresh session (Claude, Codex, whatever)
+the relay, and it continues from where you stopped — no prior coordination.
+
+`/snapshot` still exists and writes the older narrative-shaped `snapshot.ngf.md`. `/relay`
+supersedes it: a next action beats a summary, and a summary was never checked.
 
 ## Retrieve originals, feed any agent, map everything (v0.3)
 
@@ -207,10 +222,11 @@ continues from where you stopped — no prior coordination.
 ## Layout
 
 ```
-commands/   the five slash commands
-agents/     map-enricher (per-folder, parallel) + map-updater (drift-only refresh)
+commands/   the six slash commands
+agents/     map-enricher (per-folder, parallel), map-updater (drift-only refresh),
+            relay-cold-reader (scores a handoff from a cold read)
 hooks/      the drift hooks (hooks.json + handlers)
-scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, snapshot.py,
+scripts/    scan.py, audit.py, claudemd_splice.py, ctx_staleness.py, relay.py, snapshot.py,
             retrieve.py (CCR), compress.py (non-code), mcp_server.py (stdlib only)
 .mcp.json   the MCP server config (contextos_map + contextos_retrieve)
 demo/       a tiny two-service app with real, committed context-os output
@@ -223,8 +239,8 @@ CODEBASE-REPORT.md  a module-by-module map of this plugin's own code
 
 - **[INSTALL.md](INSTALL.md)** — install in two commands (beginner-friendly): prerequisites,
   verifying it worked, updating, uninstalling, troubleshooting.
-- **[HOW-TO-USE.md](HOW-TO-USE.md)** — the full user manual: the five commands in depth, **how
-  to read a map**, the drift workflow, committing maps, `/snapshot`, privacy & security, FAQ.
+- **[HOW-TO-USE.md](HOW-TO-USE.md)** — the full user manual: the six commands in depth, **how
+  to read a map**, the drift workflow, committing maps, `/relay`, privacy & security, FAQ.
 - **[docs/](docs/00-mental-model.md)** — numbered, hands-on chapters that build one small
   runnable thing at a time on the `demo/` app: generate a map, read it, drift it, retrieve an
   original, map non-code files, snapshot for cold resume.
