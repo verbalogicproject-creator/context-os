@@ -5,6 +5,21 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+- **A warning when the conversation itself becomes the cost.** Reading a file is charged once,
+  but everything already in the conversation is re-processed on every message after it — on four
+  measured sessions that re-processing was 61-73% of total token cost. No map-layout change
+  competes with that, and the only thing that resets it is ending the session. A `Stop` hook now
+  warns once as the session passes 200k / 250k / 300k tokens and points at `/relay`. Each band
+  fires at most once, and crossing a high band satisfies the lower ones, so a long session is
+  warned once rather than on three consecutive turns. The channel was verified live before
+  anything was built — on Claude Code v2.1.220 a `Stop` hook's `systemMessage` is honored alone,
+  with no `decision: "block"` and no re-prompt — so the throttled `PostToolUse` fallback was not
+  needed. State lives in `.context-os/state/`, which carries its own `.gitignore`: the existing
+  ignore file is deliberately never overwritten, so a new pattern there would never reach a
+  project that installed an earlier version. Invariant 7 holds — no permission decision, every
+  exception swallowed.
+
 ### Fixed
 - **Import resolution was quadratic in repo size.** `_match_by_suffix` walked every directory
   and every file for *every* import, so the scanner slowed as the square of the tree — on the
