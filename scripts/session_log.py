@@ -33,6 +33,41 @@ def log_dir(root: Path) -> Path:
     return root / ".context-os"
 
 
+#: Everything context-os writes into `.context-os/` is local: the per-session read ledger, the
+#: relay, and the scanner's regenerable digests (which are docstrings and signatures copied out
+#: of the project's own source — noise in a commit, and stale the moment the code moves). The
+#: maps themselves live beside the code and ARE meant to be committed.
+#:
+#: So the tool ignores its own artifacts from inside its own directory rather than editing the
+#: project's root `.gitignore` — someone else's file, with its own conventions and its own
+#: history. git honors a nested ignore file identically.
+LOCAL_IGNORE_TEXT = """\
+# context-os local artifacts — regenerable or session-scoped, never history.
+# (Your maps, `map-*.ngf.md`, live beside your code and ARE meant to be committed.)
+digests/
+reads-*.jsonl
+relay.ngf.md
+"""
+
+
+def ensure_log_dir(root: Path) -> Path:
+    """Create `.context-os/` and, once, the ignore file that keeps its contents out of git.
+
+    Never overwrites an existing ignore file. Committing a relay is a supported, deliberate
+    per-case choice, so a project may have edited this file to allow one — silently reverting
+    that would be the tool overruling the user inside their own repo.
+    """
+    directory = log_dir(root)
+    directory.mkdir(parents=True, exist_ok=True)
+    ignore = directory / ".gitignore"
+    if not ignore.exists():
+        try:
+            ignore.write_text(LOCAL_IGNORE_TEXT)
+        except OSError:
+            pass  # an unwritable ignore file must never break the thing that needed the dir
+    return directory
+
+
 def _safe(session_id: str) -> str:
     return "".join(c for c in session_id if c.isalnum() or c in "-_") or "unknown"
 
@@ -81,7 +116,7 @@ def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> 
         "owner": _rel(root, owner) if owner is not None else None,
     }
     try:
-        log_dir(root).mkdir(parents=True, exist_ok=True)
+        ensure_log_dir(root)
         with open(ledger_path(root, session_id), "a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
     except OSError:
@@ -107,7 +142,7 @@ def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Pa
         "owner": _rel(root, owner),
     }
     try:
-        log_dir(root).mkdir(parents=True, exist_ok=True)
+        ensure_log_dir(root)
         with open(ledger_path(root, session_id), "a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
     except OSError:

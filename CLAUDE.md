@@ -43,7 +43,11 @@ example of its output, see `demo/`, which carries real, committed maps.)
     **plus every descendant with no map of its own** — the same set `owning_map` resolves to that
     map, so a merged folder still drifts the map that absorbed it. For a leaf folder it is the
     old single-folder hash, byte for byte (`test_leaf_folder_hashes_exactly_as_before_the_descent`).
-  - `session_log.py` — the per-session read ledger (`.context-os/reads-<session>.jsonl`):
+  - `session_log.py` — owns `.context-os/`: `ensure_log_dir` creates it and writes the nested
+    `.gitignore` (`digests/`, `reads-*.jsonl`, `relay.ngf.md`) that keeps context-os's local
+    artifacts out of a mapped project's history — never by editing that project's root
+    `.gitignore`, and never overwriting an existing one. Also the per-session read ledger
+    (`.context-os/reads-<session>.jsonl`):
     classifies each Read/Grep/Glob as map / source-in-mapped-folder / explore. The behavioral
     ground truth for "did the agent read the map?".
   - `measure.py` — turns that ledger into the DELIVERED number (map-consultation rate); a

@@ -278,7 +278,7 @@ def capture(
     if session_id is None:
         session_id = session_log.latest_session_id(root)
 
-    target.parent.mkdir(parents=True, exist_ok=True)
+    session_log.ensure_log_dir(root)  # a relay carries conversation state — local unless opted in
     _atomic_write(target, render(root, goal, now, prefix, previous_relay, session_id))
     return target, prefix
 

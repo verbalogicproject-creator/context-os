@@ -27,6 +27,16 @@ All notable changes to context-os are documented here. Format loosely follows
   unchanged byte for byte, so baselines already committed do not drift on upgrade.
 
 ### Fixed
+- **context-os left its own local artifacts untracked in your repo.** `/context-os` writes
+  `.context-os/digests/` into the project it maps — scanner output, regenerable, and stale the
+  moment the code moves — and nothing told git to ignore it, so every mapped project grew an
+  untracked directory. `.context-os/` now carries its own `.gitignore` (`digests/`,
+  `reads-*.jsonl`, `relay.ngf.md`), written on first use by whichever writer gets there first.
+  git honors a nested ignore file identically, so the tool never has to edit a project's root
+  `.gitignore` — someone else's file, with its own conventions. An existing one is never
+  overwritten: committing a relay is a supported per-case choice, and silently reverting that
+  would be the tool overruling you in your own repo. Your maps are unaffected — they live beside
+  your code and are meant to be committed.
 - **The injection gate failed honest maps that merely mentioned a system prompt.** `system prompt`
   was matched as a bare phrase, so an AI project's own architecture doc — "Phase 4 — Integration
   (System Prompt Injection)" — failed the gate, and a false positive on a real repo blocks a map

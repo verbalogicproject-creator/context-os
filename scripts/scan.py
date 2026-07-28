@@ -611,6 +611,9 @@ def build_folder_digests(root: Path, result: ScanResult) -> Dict[str, str]:
 
 def write_digests(root: Path, result: ScanResult) -> int:
     """Write per-folder digests under `<root>/.context-os/digests/<folder>/digest.txt`. Returns count."""
+    import session_log  # local import: keeps this module off the hot hook path, and vice versa
+
+    session_log.ensure_log_dir(root)  # a digest is regenerable — ignore it from the first write
     count = 0
     for d, text in build_folder_digests(root, result).items():
         base = "root" if d == "" else d

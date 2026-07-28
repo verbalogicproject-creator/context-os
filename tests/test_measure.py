@@ -19,6 +19,43 @@ def _mapped_repo(tmp_path):
     return map_path
 
 
+def test_local_artifacts_ignore_themselves_from_inside(tmp_path):
+    """`.context-os/` holds only local artifacts, so it carries its own ignore file — rather than
+    the tool editing the project's root `.gitignore`, which is someone else's file."""
+    map_path = _mapped_repo(tmp_path)
+    session_log.record_read(tmp_path, "s1", "Read", map_path)
+
+    ignore = tmp_path / ".context-os" / ".gitignore"
+    assert ignore.is_file()
+    body = ignore.read_text()
+    rules = [ln.strip() for ln in body.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    assert set(rules) == {"digests/", "reads-*.jsonl", "relay.ngf.md"}
+    assert not any("map-" in rule for rule in rules)   # maps are meant to be committed
+
+
+def test_the_scanner_ignores_its_digests_from_the_first_write(tmp_path):
+    result = scan.scan(tmp_path if (tmp_path / "pkg").exists() else tmp_path)
+    (tmp_path / "pkg").mkdir(exist_ok=True)
+    (tmp_path / "pkg" / "m.py").write_text("import os\ndef f():\n    pass\n")
+    result = scan.scan(tmp_path)
+    scan.write_digests(tmp_path, result)
+
+    assert (tmp_path / ".context-os" / "digests").is_dir()
+    assert "digests/" in (tmp_path / ".context-os" / ".gitignore").read_text()
+
+
+def test_an_edited_ignore_file_is_never_overwritten(tmp_path):
+    """A project may have deliberately un-ignored its relay — committing one is supported. The
+    tool must not silently revert that on the next write."""
+    (tmp_path / ".context-os").mkdir()
+    edited = tmp_path / ".context-os" / ".gitignore"
+    edited.write_text("# mine\nreads-*.jsonl\n")
+
+    session_log.ensure_log_dir(tmp_path)
+
+    assert edited.read_text() == "# mine\nreads-*.jsonl\n"
+
+
 def test_classify_map_and_source(tmp_path):
     map_path = _mapped_repo(tmp_path)
     assert session_log.classify(tmp_path, map_path)[0] == session_log.KIND_MAP
