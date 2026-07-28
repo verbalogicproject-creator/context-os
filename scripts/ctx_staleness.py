@@ -26,6 +26,7 @@ Usage:
     python3 ctx_staleness.py stamp-all <root>         # stamp every map-*.ngf.md under root
     python3 ctx_staleness.py flip <map.ngf.md>        # recompute vs baseline, set the staleness flag
     python3 ctx_staleness.py check <root> <path>      # resolve the map owning <path>, then flip it
+    python3 ctx_staleness.py status <root>           # report every map's verdict; exit 1 if any drifted
 """
 
 from __future__ import annotations

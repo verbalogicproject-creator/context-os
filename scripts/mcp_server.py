@@ -24,7 +24,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import retrieve as _retrieve  # noqa: E402
 
-SERVER = {"name": "context-os", "version": "0.3.0"}
+SERVER = {"name": "context-os", "version": "0.5.0"}
 DEFAULT_PROTOCOL = "2025-06-18"
 
 
