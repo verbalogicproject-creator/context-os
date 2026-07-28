@@ -303,6 +303,12 @@ Note what that number is and isn't: it's a **cost profile**, showing where your 
 It is not proof the maps saved you anything — that's the map-consultation rate from
 `measure.py session .`.
 
+And that rate has no published result yet: the instrument runs, but what it reports is your
+own session, not evidence that maps pay off in general. It also only became trustworthy in
+0.7.0 — earlier versions logged reads from other repositories into whichever ledger the
+session happened to be sitting in, and scored them as unmapped, under-reporting map use. If
+you have a ledger from an earlier version, discard it rather than quoting it.
+
 **What languages are supported?**
 The scanner understands imports for Python, TypeScript/JavaScript (+ JSX/TSX/Vue/Svelte),
 Go, Rust, and Java/Kotlin. Other files are still listed; only the import-edge detection is

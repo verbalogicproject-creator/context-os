@@ -31,11 +31,15 @@ each message actually cost, and `measure.py cost` reads it back. **Seven out of 
 tokens went on re-reading the conversation so far.** Reading five files early doesn't cost
 you 30,000 tokens; on that session it cost 524 times that.
 
-This is why a small map is worth so much more than the size difference suggests. Swapping a
-30,000-token source read for a 3,000-token map read doesn't save you 27,000 tokens — it
-saves you 27,000 tokens *on every message that follows*. And it's why "your session starts
-cheaper" is the wrong promise: the saving isn't at the start, it accrues the whole way
-through.
+This is why a small map is worth so much more than the size difference suggests. *When* the
+agent reads the map instead, swapping a 30,000-token source read for a 3,000-token map read
+doesn't save you 27,000 tokens once — it saves them *on every message that follows*. And it's
+why "your session starts cheaper" is the wrong promise: the saving isn't at the start, it
+accrues the whole way through.
+
+That "when" is doing real work, and it is the part this tool cannot promise you. The cost
+mechanism above is measured. Whether your agent actually reaches for the map is behaviour, and
+it is what number 2 below exists to check.
 
 context-os maps your repo once into small, portable context files — one per folder plus
 a root index — that an agent reads on demand instead of re-scanning your whole project.
@@ -64,6 +68,15 @@ tokens only if a session actually reads the map.
 versus re-read (or grepped) source it already maps. `python3 scripts/measure.py session .`
 (or `/context-os-status`) reports the map-consultation rate. Ceiling tells you the
 opportunity; delivered tells you whether it landed.
+
+**Read this before quoting number 2: it has no result yet.** The instrument exists and runs,
+but no delivered rate has been collected and published here — the number you get is *your*
+session's, not evidence that maps work in general. And it only became trustworthy in 0.7.0:
+before that, a session working across two repositories logged one repository's reads into the
+other's ledger, where they scored as "no map existed" for files that have one. On one real
+session that was 57 of 80 entries, 36 of them mis-scored, always in the direction of
+under-reporting map use. Ledgers written by earlier versions should be thrown away, not quoted.
+So context-os currently claims a **mechanism**, not a saving.
 
 **3. Where your tokens actually went** — `python3 scripts/measure.py cost <session.jsonl>`
 reads the real per-message usage Claude Code already records for you:

@@ -5,6 +5,18 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+- **The delivered saving is now stated as having no result yet.** README and HOW-TO-USE
+  described the map-consultation rate as though a number existed behind it. One does not: the
+  instrument runs, but no delivered rate has ever been collected and published, so what a user
+  gets is their own session rather than evidence that maps pay off in general. Both surfaces now
+  say so, and both tell anyone holding a pre-0.7.0 ledger to discard it — before that release a
+  session working across two repositories logged one's reads into the other's ledger and scored
+  them as unmapped, always under-reporting map use. The defensible claim is the cost
+  *mechanism* (context is re-processed every turn; 61-73% of spend on four measured sessions),
+  never a token saving. `tests/test_claims.py` pins this as a copy gate, because prose has no
+  other test and a confident number drifts back in otherwise.
+
 ### Added
 - **A warning when the conversation itself becomes the cost.** Reading a file is charged once,
   but everything already in the conversation is re-processed on every message after it — on four
