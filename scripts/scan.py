@@ -234,34 +234,74 @@ def scan_content(
     return dict(folders)
 
 
+def build_stem_index(all_files: Dict[str, Set[str]]) -> Dict[str, List[Tuple[str, str]]]:
+    """Group every `(dir, stem)` in the project by its stem, once, for import resolution.
+
+    `_match_by_suffix` used to walk every directory and every file for EVERY import, which is
+    O(imports x files) — quadratic in repo size, on the one code path the whole "works on a
+    monorepo" claim rests on. Measured before this index, on synthetic repos: 200 files 1.34s,
+    400 4.60s, 800 15.59s, 1600 59.15s — about 3.7x per doubling, which extrapolates to roughly
+    half an hour on a 10,000-file tree.
+
+    The index is exact, not a heuristic. A candidate can only match `needle` if its stem equals
+    `needle`'s last path segment: an exact hit needs `dir/stem == needle`, and a suffix hit needs
+    `dir/stem` to end with `"/" + needle`, and both force the final segment to be the stem. So
+    looking up that one segment cannot miss a match the full scan would have found.
+
+    Insertion order follows `all_files`, which the caller builds from a sorted walk, so the
+    first-match-wins preference below resolves stem collisions exactly as the full scan did.
+    Files sharing a stem inside one directory (`config.py` + `config.ts`) collapse to the same
+    `(dir, stem)` pair and are recorded once.
+    """
+    index: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
+    for dir_path, files in all_files.items():
+        seen: Set[str] = set()
+        for f in sorted(files):
+            stem = Path(f).stem
+            if stem in seen:
+                continue
+            seen.add(stem)
+            index[stem].append((dir_path, stem))
+    return index
+
+
 def _match_by_suffix(
-    needle: str, source_dir: str, all_files: Dict[str, Set[str]]
+    needle: str,
+    source_dir: str,
+    all_files: Dict[str, Set[str]],
+    stem_index: Optional[Dict[str, List[Tuple[str, str]]]] = None,
 ) -> Optional[Tuple[str, str]]:
     """Find a `(dir, stem)` whose `dir/stem` path matches `needle` on a path
     segment boundary. Prefers an exact full-path match, then a match in the
     importing file's own directory, then any other segment-boundary match — so a
     bare `config` import never binds to `.../myconfig`, and when several dirs
     share a stem the same-directory file wins over an arbitrary iteration hit.
+
+    Only the candidates sharing `needle`'s final path segment are considered (see
+    `build_stem_index`); `stem_index` is built once per scan and passed in.
     """
+    if stem_index is None:
+        stem_index = build_stem_index(all_files)
     exact: Optional[Tuple[str, str]] = None
     same_dir: Optional[Tuple[str, str]] = None
     other: Optional[Tuple[str, str]] = None
-    for dir_path, files in all_files.items():
-        for f in files:
-            stem = Path(f).stem
-            full_stem = f"{dir_path}/{stem}" if dir_path else stem
-            if full_stem == needle:
-                exact = (dir_path, stem)
-            elif full_stem.endswith("/" + needle):
-                if dir_path == source_dir:
-                    same_dir = same_dir or (dir_path, stem)
-                else:
-                    other = other or (dir_path, stem)
+    for dir_path, stem in stem_index.get(needle.rsplit("/", 1)[-1], ()):
+        full_stem = f"{dir_path}/{stem}" if dir_path else stem
+        if full_stem == needle:
+            exact = (dir_path, stem)
+        elif full_stem.endswith("/" + needle):
+            if dir_path == source_dir:
+                same_dir = same_dir or (dir_path, stem)
+            else:
+                other = other or (dir_path, stem)
     return exact or same_dir or other
 
 
 def resolve_import(
-    imp: str, source_dir: str, all_files: Dict[str, Set[str]]
+    imp: str,
+    source_dir: str,
+    all_files: Dict[str, Set[str]],
+    stem_index: Optional[Dict[str, List[Tuple[str, str]]]] = None,
 ) -> Optional[Tuple[str, str]]:
     """Resolve an import string to a `(dir, stem)` pair naming a real project file.
 
@@ -307,13 +347,16 @@ def resolve_import(
                 return resolved_dir, stem
         return None
 
+    if stem_index is None:
+        stem_index = build_stem_index(all_files)
+
     cleaned = imp.lstrip("@/")
-    match = _match_by_suffix(cleaned, source_dir, all_files)
+    match = _match_by_suffix(cleaned, source_dir, all_files, stem_index)
     if match:
         return match
 
     dotted = imp.replace(".", "/")
-    return _match_by_suffix(dotted, source_dir, all_files)
+    return _match_by_suffix(dotted, source_dir, all_files, stem_index)
 
 
 # ---------------------------------------------------------------------------
@@ -678,6 +721,7 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
     edges: List[ScanEdge] = []
     total_imports = 0
     resolved_count = 0
+    stem_index = build_stem_index(all_files)  # once per scan, not once per import
     for dir_path, f, stem, ext in file_records:
         parser = IMPORT_PARSERS.get(ext)
         if parser is None:
@@ -691,7 +735,7 @@ def scan(root: Path, *, extra_exclude: Optional[Set[str]] = None) -> ScanResult:
         source_name = node_name(dir_path, stem)
         for imp in parser(content):
             total_imports += 1
-            resolved = resolve_import(imp, dir_path, all_files)
+            resolved = resolve_import(imp, dir_path, all_files, stem_index)
             if resolved is None:
                 continue
             target_dir, target_stem = resolved

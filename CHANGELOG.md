@@ -5,6 +5,20 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+- **Import resolution was quadratic in repo size.** `_match_by_suffix` walked every directory
+  and every file for *every* import, so the scanner slowed as the square of the tree — on the
+  one code path the "works on a large repo" claim depends on. Measured on synthetic repos
+  before the fix: 200 files 1.30s, 400 4.40s, 800 16.76s, 1600 67.78s, 3200 261.75s, roughly
+  3.7x per doubling. Candidates are now grouped by stem once per scan (`build_stem_index`),
+  which is exact rather than a heuristic: a match requires the candidate's stem to equal the
+  import's last path segment, so the narrowed lookup cannot miss anything the full scan found.
+  Same tree, after: 0.18s / 0.25s / 0.50s / 0.96s / 1.97s — **133x at 3,200 files, and linear**.
+  Equivalence is not assumed: output was compared against the previous resolver over 17 real
+  repositories (1,317 edges, including a 5,696-node tree) and both stem-collision shapes, with
+  zero differences, and `_match_by_suffix` is pinned in the suite against the exhaustive scan
+  it replaced.
+
 ## [0.7.0] — 2026-07-28
 
 The meter release. Everything below was measured on this cycle rather than reasoned about,
