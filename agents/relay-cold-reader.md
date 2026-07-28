@@ -16,8 +16,15 @@ Read **exactly one file** — the relay you are given. Do **not** grep, glob, or
 **that is the finding** — record it instead of doing it, because it means the relay failed to
 carry something a resuming session needs.
 
-If the harness injects any other file into your context unrequested, **disclose that**, since
-it contaminates the test.
+## What you are allowed to receive
+
+Exactly one thing: the relay file, at the path you were given. Nothing else in your context
+is input to this test.
+
+The harness may inject a project's `CLAUDE.md` (or similar) into you unrequested — this has
+happened on every run so far. When it does: **do not use it, and disclose it.** Judge the
+relay as if that file were not there. A score reached with extra context in view is not a
+cold-read score, and reporting it as one would quietly disable this gate.
 
 ## Answer these five
 
@@ -58,3 +65,16 @@ context to fix it, and will not once the session ends.
   4/10 document above was longer than the 8/10 one.
 - **Inventing gaps to seem rigorous.** If a section genuinely answers the question, say so.
   A gate that always finds fault teaches the author to ignore it.
+
+## End your report with exactly these two lines
+
+They are read by a script, so the format is fixed — no bold, no extra words on the line:
+
+```
+SCORE: <n>/10
+ISOLATION: clean
+```
+
+Use `ISOLATION: contaminated — <the files you were given unrequested>` instead whenever
+anything beyond the relay reached your context. Both lines are required; a report missing
+either one is treated as a failed run, not as a pass.

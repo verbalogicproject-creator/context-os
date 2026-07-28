@@ -313,6 +313,53 @@ def budget(path: Path) -> Tuple[int, List[Tuple[int, str]]]:
 
 
 # ---------------------------------------------------------------------------
+# gate — read the cold-reader's verdict; the judgement is a model call, this is not
+# ---------------------------------------------------------------------------
+
+#: The pass mark. A relay that scores below this is fixed and re-scored while the session
+#: that could fix it still exists — after it ends, the context is gone and the gate is moot.
+PASS_MARK = 8
+
+_SCORE_RE = re.compile(r"^SCORE:\s*(\d+)\s*/\s*10\s*$", re.MULTILINE)
+_ISOLATION_RE = re.compile(r"^ISOLATION:\s*(clean|contaminated)\b(.*)$", re.MULTILINE)
+
+
+def parse_gate_report(text: str) -> dict:
+    """Pull the two machine-readable lines out of a `relay-cold-reader` report.
+
+    The score itself is a judgement only a model can make — this parses it, it does not
+    reproduce it. Both lines are REQUIRED: a report missing either is treated as a failed
+    run, never as a pass, because an unparseable verdict read as "fine" is the one failure
+    mode that would quietly disable the gate.
+
+    `isolation` is carried beside the score, and NOT folded into the pass/fail. Measured
+    3 runs out of 3: the harness injects the project's CLAUDE.md — and the user's memory
+    index, and an agent-type listing — into a subagent unrequested, both before the task and
+    again by system-reminder after the Read. Failing the gate on that would block every
+    relay forever, on a condition the author cannot fix. So contamination makes the score
+    **provisional** — reported loudly, recorded beside the number — while the pass/fail
+    stays on the score, which is what the author can actually act on.
+    """
+    score_match = _SCORE_RE.search(text)
+    isolation_match = _ISOLATION_RE.search(text)
+    score = int(score_match.group(1)) if score_match else None
+    isolation = isolation_match.group(1) if isolation_match else None
+    return {
+        "score": score,
+        "isolation": isolation,
+        "contamination": (isolation_match.group(2).strip(" —-") if isolation_match else ""),
+        "provisional": isolation != "clean",
+        "passed": score is not None and isolation is not None and score >= PASS_MARK,
+        "reason": (
+            "no SCORE: n/10 line in the report" if score is None
+            else "no ISOLATION: line in the report" if isolation is None
+            else f"scored {score}/10, below the {PASS_MARK}/10 pass mark" if score < PASS_MARK
+            else ""
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -335,6 +382,9 @@ def main(argv=None) -> int:
     pre = sub.add_parser("prefix", help="Print the current context prefix, in tokens")
     pre.add_argument("root", type=Path)
     pre.add_argument("--transcript", type=Path, default=None)
+
+    gat = sub.add_parser("gate", help="Read a cold-reader report and decide pass/fail")
+    gat.add_argument("report", type=Path, help="The reader's report ('-' for stdin)")
 
     args = parser.parse_args(argv)
 
@@ -367,6 +417,23 @@ def main(argv=None) -> int:
         for number, line in unfilled:
             print(f"unfilled slot at line {number}: {line}", file=sys.stderr)
         return 1 if (chars > CHAR_CEILING or unfilled) else 0
+
+    if args.mode == "gate":
+        text = sys.stdin.read() if str(args.report) == "-" else args.report.read_text(errors="ignore")
+        verdict = parse_gate_report(text)
+        print(f"score {verdict['score']}/10 · isolation {verdict['isolation']}"
+              if verdict["score"] is not None else "unreadable report")
+        if verdict["provisional"] and verdict["contamination"]:
+            print(f"PROVISIONAL — the reader also saw: {verdict['contamination']}",
+                  file=sys.stderr)
+            print("  so this is not a clean cold-read score; record it as provisional",
+                  file=sys.stderr)
+        if verdict["passed"]:
+            return 0
+        print(f"GATE FAILED — {verdict['reason']}", file=sys.stderr)
+        print("  fix the relay now — the context that could fix it ends with this session",
+              file=sys.stderr)
+        return 1
 
     transcript = args.transcript or find_transcript(args.root.resolve())
     if transcript is None or not transcript.is_file():

@@ -254,6 +254,98 @@ def test_a_fresh_capture_is_under_budget_but_not_yet_filled(tmp_path):
     assert relay.main(["budget", str(target)]) == 1
 
 
+# --- the cold-read gate: the harness around a judgement, not the judgement ---------------
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures" / "relay"
+
+PASSING_REPORT = """The next action is clear: create scripts/relay.py.
+
+SCORE: 8/10
+ISOLATION: clean
+"""
+
+
+def test_gate_passes_at_the_mark_with_clean_isolation():
+    verdict = relay.parse_gate_report(PASSING_REPORT)
+
+    assert verdict == {"score": 8, "isolation": "clean", "contamination": "",
+                       "provisional": False, "passed": True, "reason": ""}
+
+
+def test_gate_fails_below_the_mark():
+    verdict = relay.parse_gate_report("SCORE: 7/10\nISOLATION: clean\n")
+
+    assert verdict["passed"] is False
+    assert "below the 8/10 pass mark" in verdict["reason"]
+
+
+def test_contamination_makes_a_score_provisional_not_failed():
+    """Measured 3/3 runs: the harness injects CLAUDE.md and the user's memory index.
+
+    Failing on that would block every relay forever, on a condition the author cannot fix.
+    The number is still recorded — as provisional, never as clean.
+    """
+    verdict = relay.parse_gate_report(
+        "SCORE: 9/10\nISOLATION: contaminated — /root/projects/context-os/CLAUDE.md\n")
+
+    assert verdict["passed"] is True
+    assert verdict["provisional"] is True
+    assert verdict["contamination"] == "/root/projects/context-os/CLAUDE.md"
+
+
+def test_a_contaminated_run_below_the_mark_still_fails():
+    verdict = relay.parse_gate_report("SCORE: 2/10\nISOLATION: contaminated — CLAUDE.md\n")
+
+    assert verdict["passed"] is False
+    assert verdict["provisional"] is True
+
+
+@pytest.mark.parametrize("report, missing", [
+    ("ISOLATION: clean\n", "SCORE"),
+    ("SCORE: 9/10\n", "ISOLATION"),
+    ("the relay was great, 9 out of 10\n", "SCORE"),
+    ("", "SCORE"),
+])
+def test_an_unreadable_report_is_a_failure_never_a_pass(report, missing):
+    """The one failure mode that would silently disable the gate."""
+    verdict = relay.parse_gate_report(report)
+
+    assert verdict["passed"] is False
+    assert missing in verdict["reason"]
+
+
+def test_gate_cli_exits_both_ways(tmp_path):
+    good = tmp_path / "good.txt"
+    good.write_text(PASSING_REPORT)
+    bad = tmp_path / "bad.txt"
+    bad.write_text("SCORE: 4/10\nISOLATION: clean\n")
+
+    assert relay.main(["gate", str(good)]) == 0
+    assert relay.main(["gate", str(bad)]) == 1
+
+
+def test_both_fixtures_exist_and_the_good_one_is_complete():
+    good = (FIXTURES / "good.ngf.md").read_text()
+
+    for heading, _rule in relay.AUTHORED_SLOTS:
+        assert f"\n{heading}" in good
+    assert relay.unfilled_slots(good) == []
+
+
+def test_budget_alone_cannot_tell_the_fixtures_apart():
+    """Why the gate is a model call: the deterministic check passes BOTH files.
+
+    `budget` proves a relay is short enough and has no placeholder left. It cannot prove a
+    fresh session could resume from it — the gutted fixture satisfies every mechanical rule
+    and is still unresumable. Asserting this keeps the two checks from being confused for
+    each other, the same way `audit.py savings` is kept distinct from the delivered number.
+    """
+    for name in ("good.ngf.md", "gutted.ngf.md"):
+        chars, unfilled = relay.budget(FIXTURES / name)
+        assert chars < relay.CHAR_CEILING
+        assert unfilled == []
+
+
 def test_cli_is_runnable_as_a_script(tmp_path):
     out = subprocess.run(
         [sys.executable, str(SCRIPT), "capture", str(tmp_path), "--goal", "go"],

@@ -6,8 +6,11 @@ example of its output, see `demo/`, which carries real, committed maps.)
 ## Layout
 
 - `.claude-plugin/plugin.json` — plugin manifest (metadata only; dirs auto-discovered).
-- `commands/*.md` — the five slash commands (`/context-os`, `/context-os-catchup`,
-  `/context-os-update`, `/context-os-status`, `/snapshot`). `/context-os` is the **orchestrator**:
+- `commands/*.md` — the six slash commands (`/context-os`, `/context-os-catchup`,
+  `/context-os-update`, `/context-os-status`, `/snapshot`, `/relay`). `/relay` writes the
+  cold-start handoff and **blocks on a cold-read gate** — `relay.py capture` → the main
+  session fills the authored half → `budget` → a `relay-cold-reader` agent scores it → below
+  8/10 the session fixes the relay before it ends. `/context-os` is the **orchestrator**:
   scan → `plan.py` ranks folders → fan out one `map-enricher` per **DEEP** folder in parallel →
   repair loop → fold content into parents; `--skeleton` skips enrichment, `--premium` runs Sonnet,
   `--all` enriches every folder. `/context-os-catchup` is the **lazy** path: after a `--skeleton`
@@ -42,7 +45,10 @@ example of its output, see `demo/`, which carries real, committed maps.)
     with every authored slot emitted as a literal `TODO(relay):` line), `budget` (a
     16,000-CHARACTER ceiling; fails while any slot outside a fence is unfilled), `prefix`
     (current context size, from a bounded tail of the session transcript — never the whole
-    file). A relay supersedes `snapshot` and reuses its `git_state`/`map_hashes`.
+    file), `gate` (parses the cold reader's `SCORE:`/`ISOLATION:` trailer; fails below 8/10,
+    and marks a score **provisional** when the reader disclosed injected context rather than
+    failing on it — every run so far has been contaminated, and a gate that can never pass is
+    not a gate). A relay supersedes `snapshot` and reuses its `git_state`/`map_hashes`.
   - `retrieve.py` — CCR: resolve a `path[:symbol]` anchor to the exact original block + hash
     (ast-exact for Python; literal-aware best-effort elsewhere, with a `low_confidence` flag).
   - `compress.py` — content-aware compressed views for non-code files (config/doc/data/log).
