@@ -19,6 +19,35 @@ def _mapped_repo(tmp_path):
     return map_path
 
 
+def test_a_read_in_another_repo_is_never_logged_here(tmp_path):
+    """The meter's correctness, pinned. A session whose cwd was repo A logged repo B's reads into
+    A's ledger, where `owning_map` looked for B's maps under A, found none, and scored them
+    `source_unmapped`. Measured on one real session: 57 of 80 entries foreign-root, 36 of them
+    scored "no map existed" for files that have one — an under-report of map use, which is the
+    exact direction that makes the tool look worse than it is while still looking usable."""
+    root = tmp_path / "repo-a"
+    root.mkdir()
+    (root / "pkg").mkdir()
+    (root / "pkg" / "m.py").write_text("import os\ndef f():\n    pass\n")
+    scan.write_ngf_skeletons(root, scan.scan(root))
+
+    other = tmp_path / "repo-b"
+    (other / "pkg").mkdir(parents=True)
+    foreign = other / "pkg" / "m.py"
+    foreign.write_text("import os\ndef g():\n    pass\n")
+
+    assert session_log.contains(root, root / "pkg" / "m.py") is True
+    assert session_log.contains(root, foreign) is False
+    assert session_log.classify(root, foreign)[0] == session_log.KIND_OTHER
+    assert session_log.record_read(root, "s1", "Read", foreign) is None
+    assert session_log.record_explore(root, "s1", "Grep", other / "pkg") is None
+    assert session_log.reads(root, "s1") == []
+
+    # ...and a read that IS local still lands, so the guard didn't just silence the ledger
+    assert session_log.record_read(root, "s1", "Read", root / "pkg" / "m.py") is not None
+    assert len(session_log.reads(root, "s1")) == 1
+
+
 def test_local_artifacts_ignore_themselves_from_inside(tmp_path):
     """`.context-os/` holds only local artifacts, so it carries its own ignore file — rather than
     the tool editing the project's root `.gitignore`, which is someone else's file."""

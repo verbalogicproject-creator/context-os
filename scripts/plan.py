@@ -58,8 +58,25 @@ ENTRY_STEMS = frozenset(
 DEFAULT_DEEP_MIN_FILES = 3
 DEFAULT_HUB_IN = 2
 
-# A folder below BOTH of these is too thin to be worth its own map file.
-DEFAULT_MERGE_MAX_FILES = 4
+# Merging CODE folders is OFF by default — measured, not assumed.
+#
+# The first cut of this rule merged a 17-folder project into 6 maps and looked like a 34.6%
+# win on the size of the whole map set. That is the wrong metric: a session does not read the
+# set, it reads the one map covering the folder it is in. Measured per folder on the same
+# source, 12 of 15 folders cost MORE and none cost less — `services` went 95 → 634 tokens,
+# 6.7x — because merging trades fragmentation for DILUTION, and the nine folders absorbed
+# into one map averaged 125 tokens each, so the merged map only pays off once a task spans
+# ~6 of them. Real tasks span two or three.
+#
+# So the default is one map per folder for code: zero dilution, which is the safe prior when
+# nothing is known about how the folders are actually read together. `merge_max_files=0`
+# leaves only the original FOLD behaviour (code-free docs/data folders merge into their
+# parent, which was always right — they carry no architecture of their own).
+#
+# Turning it on should be EARNED, not guessed: the read ledger records which folders a session
+# touched, so folders genuinely read together are the ones worth sharing a map. Until that is
+# wired, these are opt-in flags and the numbers above are the reason.
+DEFAULT_MERGE_MAX_FILES = 0
 DEFAULT_MERGE_HUB_IN = 5
 
 
@@ -113,9 +130,13 @@ def _wants_merge(row: dict, host: Optional[dict], merge_max_files: int, merge_hu
     otherwise pull `backend/` and `frontend/` into a docs map — the merge running upward past
     the architecture instead of stopping at it.
     """
-    if row["code_files"] and host is not None and host["code_files"] == 0:
+    if row["code_files"] == 0:
+        return True                      # no architecture of its own — always folds (the old FOLD tier)
+    if merge_max_files <= 0:
+        return False                     # code folders keep their own map unless merging is asked for
+    if host is not None and host["code_files"] == 0:
         return False
-    if row["code_files"] == 0 or row["tier"] == "SKELETON":
+    if row["tier"] == "SKELETON":
         return True
     return row["code_files"] <= merge_max_files and row["in_degree"] < merge_hub_in
 

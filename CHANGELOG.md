@@ -6,6 +6,26 @@ All notable changes to context-os are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Changed
+- **Merging code folders is OFF by default — it measured negative.** The rule below shipped
+  earlier in this cycle and was measured within the hour: on a real 17-folder project it cut the
+  whole map set by 34.6%, which is the wrong metric, because a session reads the one map covering
+  the folder it is in, not the set. Per folder, on identical source, **12 of 15 cost more and none
+  cost less** — `services` went 95 → 634 tokens, 6.7×. Merging trades fragmentation for
+  **dilution**, and the nine folders absorbed into one map averaged 125 tokens each, so the merged
+  map only pays off once a task spans ~6 of them; real tasks span two or three. The default is now
+  one map per folder (zero dilution, the safe prior); `--merge-max-files` turns merging on
+  explicitly. Code-free docs/data folders still fold into their parent, as they always did.
+
+### Fixed
+- **The read ledger scored another repo's files as unmapped.** `_rel` fell back to an absolute
+  path instead of refusing when a read landed outside the root, so a session whose cwd was repo A
+  logged repo B's reads into A's ledger — where `owning_map` looked for B's maps under A, found
+  none, and recorded `source_unmapped` for files that have a map. Measured on one real session:
+  **57 of 80 entries were foreign-root, 36 of them mis-scored**. This is the instrument the whole
+  delivered-savings claim rests on, and it was under-reporting map use — the direction that looks
+  usable while being wrong. Paths outside the root are now `KIND_OTHER` and never logged.
+
+### Changed
 - **A folder no longer automatically gets its own map file.** One map per folder over-fragments a
   small project — five folders holding one file each cost five reads and five headers — while one
   map for a whole repo makes every session pay for the parts it isn't touching. `plan.py` now makes

@@ -93,9 +93,23 @@ def _merge_repo(tmp_path):
     (tmp_path / "pkg" / "docs" / "guide.md").write_text("# Guide\n\n## S\ntext\n")
 
 
-def test_thin_folder_merges_up_and_hub_keeps_its_own_map(tmp_path):
+def test_code_folders_keep_their_own_map_by_default(tmp_path):
+    """Merging code folders trades fragmentation for DILUTION, and measured on a real project it
+    lost: 12 of 15 folders cost more to read, none less. So the default is one map per folder —
+    zero dilution — and merging is opt-in until a ledger says which folders are read together."""
     _merge_repo(tmp_path)
     plan = plan_mod.compute_plan(tmp_path)
+
+    assert _row(plan, "pkg/thin")["keeps_map"] is True     # one file, but still its own map
+    assert _row(plan, "pkg/hub")["keeps_map"] is True
+    assert _row(plan, "pkg")["keeps_map"] is True
+    assert _row(plan, "pkg/docs")["keeps_map"] is False    # code-free still folds — it always did
+    assert _row(plan, "pkg/docs")["fold_into"] == "pkg"
+
+
+def test_thin_folder_merges_up_and_hub_keeps_its_own_map(tmp_path):
+    _merge_repo(tmp_path)
+    plan = plan_mod.compute_plan(tmp_path, merge_max_files=4)   # opt-in
 
     thin = _row(plan, "pkg/thin")
     assert thin["keeps_map"] is False
@@ -111,7 +125,7 @@ def test_thin_folder_merges_up_and_hub_keeps_its_own_map(tmp_path):
 
 def test_merged_folders_are_not_separately_enriched(tmp_path):
     _merge_repo(tmp_path)
-    plan = plan_mod.compute_plan(tmp_path)
+    plan = plan_mod.compute_plan(tmp_path, merge_max_files=4)   # opt-in
     enrich = plan["summary"]["enrich"]
     assert "pkg" in enrich and "pkg/hub" in enrich
     assert "pkg/thin" not in enrich            # its files are described inside pkg's map
@@ -154,7 +168,7 @@ def test_apply_fold_moves_code_nodes_and_their_digest(tmp_path):
     assert (tmp_path / "pkg" / "thin" / "map-thin.ngf.md").is_file()
     assert (tmp_path / ".context-os" / "digests" / "pkg/thin" / "digest.txt").is_file()
 
-    folded = plan_mod.apply_fold(tmp_path)
+    folded = plan_mod.apply_fold(tmp_path, merge_max_files=4)   # opt-in
 
     assert {f["folder"] for f in folded["folded"]} >= {"pkg/thin", "pkg/docs"}
     assert not (tmp_path / "pkg" / "thin" / "map-thin.ngf.md").exists()

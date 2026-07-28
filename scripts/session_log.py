@@ -76,15 +76,35 @@ def ledger_path(root: Path, session_id: str) -> Path:
     return log_dir(root) / f"reads-{_safe(session_id)}.jsonl"
 
 
-def _rel(root: Path, resolved: Path) -> str:
+def _rel(root: Path, resolved: Path) -> Optional[str]:
+    """Repo-relative path, or None if `resolved` is OUTSIDE `root`.
+
+    Returning None rather than the absolute path is the whole correctness of the ledger. This
+    used to fall back to `str(resolved)`, and a session whose cwd is repo A while it reads files
+    in repo B logged B's reads into A's ledger — where `owning_map` then looked for B's maps
+    under A, found none, and scored them `source_unmapped`. Measured on one real session: 57 of
+    80 entries were foreign-root, 36 of them scored "no map existed" for files that have one.
+    A meter that under-reports map use is worse than no meter, because the number looks usable.
+    """
     try:
         return str(resolved.resolve().relative_to(root.resolve()))
     except ValueError:
-        return str(resolved)
+        return None
+
+
+def contains(root: Path, resolved: Path) -> bool:
+    """True if `resolved` lives inside `root` — the precondition for logging it at all."""
+    return _rel(root, resolved) is not None
 
 
 def classify(root: Path, resolved: Path) -> Tuple[str, Optional[Path]]:
-    """Classify a path as (kind, owning_map). owning_map is set only for source_mapped."""
+    """Classify a path as (kind, owning_map). owning_map is set only for source_mapped.
+
+    A path outside `root` is KIND_OTHER: this ledger cannot say anything true about it, and
+    guessing is how the foreign-root defect scored mapped files as unmapped.
+    """
+    if not contains(root, resolved):
+        return KIND_OTHER, None
     if ctx_staleness._is_map_file(resolved):
         return KIND_MAP, None
     if resolved.suffix in ctx_staleness.SRC_EXT:
@@ -103,6 +123,9 @@ def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> 
     """
     kind, owner = classify(root, resolved)
     if kind == KIND_OTHER:
+        return None  # includes every path outside `root` — not this ledger's to describe
+    rel = _rel(root, resolved)
+    if rel is None:
         return None
     try:
         size = resolved.stat().st_size if resolved.is_file() else 0
@@ -110,7 +133,7 @@ def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> 
         size = 0
     entry = {
         "tool": tool_name,
-        "path": _rel(root, resolved),
+        "path": rel,
         "kind": kind,
         "bytes": size,
         "owner": _rel(root, owner) if owner is not None else None,
@@ -131,12 +154,15 @@ def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Pa
     whether the pointer block is actually changing behavior. Returns the entry, or None if
     the searched folder has no map.
     """
+    rel = _rel(root, resolved_dir)
+    if rel is None:
+        return None  # a Grep in another repo says nothing about this one's maps
     owner = ctx_staleness.owning_map(root, resolved_dir)
     if owner is None:
         return None
     entry = {
         "tool": tool_name,
-        "path": _rel(root, resolved_dir),
+        "path": rel,
         "kind": KIND_EXPLORE,
         "bytes": 0,
         "owner": _rel(root, owner),
