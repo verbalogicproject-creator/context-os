@@ -13,7 +13,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from _common import bootstrap_import, emit, read_hook_input, repo_root_from, tool_failed
+from _common import bootstrap_import, emit, read_hook_input, repo_root_from, root_for_path, tool_failed
 
 bootstrap_import()
 
@@ -34,9 +34,11 @@ def main() -> int:
         emit({})
         return 0
 
-    root = repo_root_from(hook_input)
     target = Path(file_path)
-    resolved = target if target.is_absolute() else (root / target)
+    resolved = target if target.is_absolute() else (repo_root_from(hook_input) / target)
+    # Drift belongs to the edited file's own repo — editing project B from a session rooted in
+    # repo A must flip B's map, not look for it under A and find nothing.
+    root = root_for_path(hook_input, resolved)
 
     # Only a source file can move a folder's structural signature. (Editing a map's own
     # descriptions must NOT drift it — the signature is of the source, not the map.)

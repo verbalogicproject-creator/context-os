@@ -17,6 +17,20 @@ All notable changes to context-os are documented here. Format loosely follows
   explicitly. Code-free docs/data folders still fold into their parent, as they always did.
 
 ### Fixed
+- **A fan-out of subagents was recorded as one session.** Claude Code gives every subagent the
+  `session_id` of the session that spawned it, so five parallel enrichers appeared in the ledger
+  as one session that had touched all five folders. Co-access — which folders get read *together*
+  — is computed from exactly that, so it was measuring the shape of the fan-out rather than of the
+  task. Each entry now carries the `agent` that made it (`null` = the main session), and
+  `session_log.agents()` lists the distinct actors. The field name was **observed, not assumed**:
+  a probe of the live PreToolUse input on Claude Code v2.1.220 showed `agent_id` + `agent_type`
+  populated only inside a subagent. (`CLAUDE_CODE_CHILD_SESSION` is deliberately unused — the
+  probe found it set to `"1"` in the main session too, so it does not discriminate.) Ledgers
+  written before this column keep reading as main-session entries.
+- **The map nudge is now scoped per agent.** A subagent starts with its own empty context and has
+  not inherited the parent's map read, so a sibling's read no longer silences it — previously the
+  first reader in a fan-out suppressed the hint for every other agent, exactly when the map would
+  have saved the most.
 - **The read ledger scored another repo's files as unmapped.** `_rel` fell back to an absolute
   path instead of refusing when a read landed outside the root, so a session whose cwd was repo A
   logged repo B's reads into A's ledger — where `owning_map` looked for B's maps under A, found

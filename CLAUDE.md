@@ -49,7 +49,10 @@ example of its output, see `demo/`, which carries real, committed maps.)
     `.gitignore`, and never overwriting an existing one. Also the per-session read ledger
     (`.context-os/reads-<session>.jsonl`):
     classifies each Read/Grep/Glob as map / source-in-mapped-folder / explore. The behavioral
-    ground truth for "did the agent read the map?".
+    ground truth for "did the agent read the map?". Each entry also records the `agent` that made
+    it (`null` = the main session) — Claude Code hands a subagent its **parent's** `session_id`,
+    so without that column a fan-out of N enrichers is indistinguishable from one session that
+    read N folders. `reads()` takes an optional agent scope; `agents()` lists the distinct actors.
   - `measure.py` — turns that ledger into the DELIVERED number (map-consultation rate); a
     best-effort `transcript` mode reads Claude Code's own session `.jsonl`.
   - `snapshot.py` — the mechanical scaffolder for `/snapshot`.

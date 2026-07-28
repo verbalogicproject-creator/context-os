@@ -115,11 +115,21 @@ def classify(root: Path, resolved: Path) -> Tuple[str, Optional[Path]]:
     return KIND_OTHER, None
 
 
-def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> Optional[dict]:
+#: Sentinel for "every agent" — distinct from `None`, which means the main session specifically.
+ANY_AGENT = object()
+
+
+def record_read(root: Path, session_id: str, tool_name: str, resolved: Path,
+                agent_id: Optional[str] = None) -> Optional[dict]:
     """Append one classified read entry to the session ledger. Returns the entry, or None.
 
     `other`-kind reads are not logged — they carry no signal about map use and would only
     bloat the ledger (and cost a write on a filesystem this environment flags as slow).
+
+    `agent_id` is the subagent that made the call (None = the main session). Claude Code gives
+    every subagent its PARENT's `session_id`, so without this column a fan-out of five
+    enrichers is indistinguishable from one session that read all five folders — which is
+    exactly the co-access signal earned merging would be computed from.
     """
     kind, owner = classify(root, resolved)
     if kind == KIND_OTHER:
@@ -137,6 +147,7 @@ def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> 
         "kind": kind,
         "bytes": size,
         "owner": _rel(root, owner) if owner is not None else None,
+        "agent": agent_id,
     }
     try:
         ensure_log_dir(root)
@@ -147,7 +158,8 @@ def record_read(root: Path, session_id: str, tool_name: str, resolved: Path) -> 
     return entry
 
 
-def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Path) -> Optional[dict]:
+def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Path,
+                   agent_id: Optional[str] = None) -> Optional[dict]:
     """Log a Grep/Glob over a folder that has a map (kind=explore_mapped), else no-op.
 
     This is the fan-out exploration the map exists to replace — measuring it is how we learn
@@ -166,6 +178,7 @@ def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Pa
         "kind": KIND_EXPLORE,
         "bytes": 0,
         "owner": _rel(root, owner),
+        "agent": agent_id,
     }
     try:
         ensure_log_dir(root)
@@ -176,8 +189,14 @@ def record_explore(root: Path, session_id: str, tool_name: str, resolved_dir: Pa
     return entry
 
 
-def reads(root: Path, session_id: str) -> List[dict]:
-    """Load this session's ledger entries (empty list if missing/corrupt — never raises)."""
+def reads(root: Path, session_id: str, agent_id=ANY_AGENT) -> List[dict]:
+    """Load this session's ledger entries (empty list if missing/corrupt — never raises).
+
+    `agent_id` defaults to ANY_AGENT (every entry, the whole session including its subagents).
+    Pass an id — or None for the main session — to scope to one actor. Entries written before
+    the agent column existed have no `agent` key and read as main-session, which is what they
+    were.
+    """
     path = ledger_path(root, session_id)
     if not path.is_file():
         return []
@@ -196,21 +215,42 @@ def reads(root: Path, session_id: str) -> List[dict]:
             continue
         if isinstance(item, dict):
             out.append(item)
+    if agent_id is not ANY_AGENT:
+        out = [e for e in out if e.get("agent") == agent_id]
     return out
 
 
-def map_read_this_session(root: Path, session_id: str, owner_map: Path) -> bool:
-    """True if this session already read the map file `owner_map`."""
+def agents(root: Path, session_id: str) -> List[Optional[str]]:
+    """Every distinct actor in this session's ledger, main session (None) first.
+
+    A session with more than one entry here was a fan-out, not one reader — the distinction
+    `measure.py` needs before any co-access number computed from this ledger means anything.
+    """
+    seen: List[Optional[str]] = []
+    for entry in reads(root, session_id):
+        who = entry.get("agent")
+        if who not in seen:
+            seen.append(who)
+    return sorted(seen, key=lambda a: (a is not None, a or ""))
+
+
+def map_read_this_session(root: Path, session_id: str, owner_map: Path, agent_id=ANY_AGENT) -> bool:
+    """True if this session — or, scoped, this one agent — already read the map `owner_map`.
+
+    The nudge scopes to the agent: a subagent gets its own context, so the parent having read
+    the map is no reason to stay quiet at the subagent that has not.
+    """
     target = _rel(root, owner_map)
-    return any(e.get("kind") == KIND_MAP and e.get("path") == target for e in reads(root, session_id))
+    return any(e.get("kind") == KIND_MAP and e.get("path") == target
+               for e in reads(root, session_id, agent_id))
 
 
-def folder_touched_before(root: Path, session_id: str, owner_rel: str) -> bool:
+def folder_touched_before(root: Path, session_id: str, owner_rel: str, agent_id=ANY_AGENT) -> bool:
     """True if this session already logged a read whose owning map is `owner_rel`.
 
     Used to fire the "there's a map for this folder" nudge at most once per folder.
     """
-    for entry in reads(root, session_id):
+    for entry in reads(root, session_id, agent_id):
         if entry.get("path") == owner_rel or entry.get("owner") == owner_rel:
             return True
     return False

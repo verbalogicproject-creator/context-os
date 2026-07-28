@@ -19,6 +19,97 @@ def _mapped_repo(tmp_path):
     return map_path
 
 
+def test_a_fanout_of_agents_is_distinguishable_from_one_session(tmp_path):
+    """Plan #14 item 1(c). Claude Code hands every subagent its PARENT's `session_id` — observed
+    live on v2.1.220, where two parallel `general-purpose` agents both reported the session id of
+    the session that spawned them, and were told apart only by `agent_id`.
+
+    Without that column the ledger says "one session read three folders" when what happened was
+    three agents reading one folder each. Co-access (item 2) is computed from exactly this, so
+    earned merging would have been fitted to the shape of the fan-out rather than of the task.
+    """
+    _mapped_repo(tmp_path)
+    src = tmp_path / "pkg" / "m.py"
+
+    session_log.record_read(tmp_path, "S", "Read", src)                  # the main session
+    session_log.record_read(tmp_path, "S", "Read", src, "agent-aaa")     # two parallel subagents
+    session_log.record_read(tmp_path, "S", "Read", src, "agent-bbb")
+
+    # One ledger, because they really are one session — but three separable actors inside it.
+    assert len(session_log.reads(tmp_path, "S")) == 3
+    assert session_log.agents(tmp_path, "S") == [None, "agent-aaa", "agent-bbb"]
+
+    # Scoping to an actor returns only that actor's reads: this is the fan-out, not one reader.
+    assert len(session_log.reads(tmp_path, "S", None)) == 1
+    assert len(session_log.reads(tmp_path, "S", "agent-aaa")) == 1
+    assert len(session_log.reads(tmp_path, "S", "agent-bbb")) == 1
+
+
+def test_one_agents_map_read_does_not_silence_the_nudge_for_its_siblings(tmp_path):
+    """A subagent starts with its own context and has NOT inherited the parent's map read, so
+    the nudge is scoped per agent. Session-wide scoping would tell four of five parallel
+    enrichers nothing, precisely when the map would have saved the most."""
+    map_path = _mapped_repo(tmp_path)
+
+    session_log.record_read(tmp_path, "S", "Read", map_path, "agent-aaa")   # aaa read the map
+
+    assert session_log.map_read_this_session(tmp_path, "S", map_path, "agent-aaa") is True
+    assert session_log.map_read_this_session(tmp_path, "S", map_path, "agent-bbb") is False
+    assert session_log.map_read_this_session(tmp_path, "S", map_path, None) is False
+    # unscoped still answers the session-wide question, for callers that want it
+    assert session_log.map_read_this_session(tmp_path, "S", map_path) is True
+
+
+def test_a_ledger_written_before_the_agent_column_still_reads_as_main_session(tmp_path):
+    """Backward compatibility, stated as a test: entries already on disk have no `agent` key.
+    They were written by main sessions, and must keep reading as main-session entries rather
+    than vanishing from every scoped query."""
+    _mapped_repo(tmp_path)
+    ledger = session_log.ledger_path(tmp_path, "OLD")
+    session_log.ensure_log_dir(tmp_path)
+    ledger.write_text(json.dumps(
+        {"tool": "Read", "path": "pkg/m.py", "kind": "source_unmapped", "bytes": 30, "owner": None}
+    ) + "\n")
+
+    assert len(session_log.reads(tmp_path, "OLD")) == 1
+    assert len(session_log.reads(tmp_path, "OLD", None)) == 1      # reads as the main session
+    assert session_log.agents(tmp_path, "OLD") == [None]
+
+
+def test_the_hook_attributes_a_read_to_the_files_repo_not_the_sessions(tmp_path):
+    """The other half of the meter fix. Refusing a foreign read (above) stops the ledger being
+    WRONG; resolving the root from the file stops it being EMPTY. One session working across two
+    repos — a tool's own repo and the project it is run against — is routine, and it must produce
+    two honest ledgers rather than one poisoned one or none at all."""
+    import _common
+
+    tool_repo = tmp_path / "tool-repo"
+    (tool_repo / "scripts").mkdir(parents=True)
+    (tool_repo / ".git").mkdir()
+
+    project = tmp_path / "project"
+    (project / "pkg").mkdir(parents=True)
+    (project / "pkg" / "m.py").write_text("import os\ndef f():\n    pass\n")
+    scan.write_ngf_skeletons(project, scan.scan(project))     # gives it an index.ngf.md
+    assert (project / "index.ngf.md").is_file()
+
+    hook_input = {"cwd": str(tool_repo)}                       # the session sits in the TOOL repo
+    resolved = project / "pkg" / "m.py"                        # but this read is in the PROJECT
+
+    assert _common.repo_root_from(hook_input) == tool_repo.resolve()   # session root: tool repo
+    assert _common.root_for_path(hook_input, resolved) == project.resolve()
+
+    # and a read inside the session's own repo still resolves to it (no regression)
+    own = tool_repo / "scripts" / "x.py"
+    own.write_text("def x():\n    pass\n")
+    assert _common.root_for_path(hook_input, own) == tool_repo.resolve()
+
+    # a file under no marked root at all falls back to the session root, as before
+    loose = tmp_path / "loose.py"
+    loose.write_text("def y():\n    pass\n")
+    assert _common.root_for_path(hook_input, loose) == tool_repo.resolve()
+
+
 def test_a_read_in_another_repo_is_never_logged_here(tmp_path):
     """The meter's correctness, pinned. A session whose cwd was repo A logged repo B's reads into
     A's ledger, where `owning_map` looked for B's maps under A, found none, and scored them

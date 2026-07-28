@@ -19,7 +19,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from _common import bootstrap_import, emit, read_hook_input, repo_root_from
+from _common import (agent_id_from, bootstrap_import, emit, read_hook_input, repo_root_from,
+                     root_for_path)
 
 bootstrap_import()
 
@@ -29,9 +30,14 @@ from ctx_staleness import _is_map_file, flip  # noqa: E402
 WATCHED_TOOLS = frozenset({"Read", "Grep", "Glob"})
 
 
-def _first_source_touch(root: Path, session_id: str, owner_rel: str) -> bool:
-    """True iff exactly one ledger entry so far owns `owner_rel` (this one) — i.e. first touch."""
-    same = [e for e in session_log.reads(root, session_id) if e.get("owner") == owner_rel]
+def _first_source_touch(root: Path, session_id: str, owner_rel: str, agent_id) -> bool:
+    """True iff exactly one of THIS agent's entries owns `owner_rel` (this one) — first touch.
+
+    Scoped per agent: without it, one subagent's read silences the nudge for every sibling in
+    the same fan-out, each of which has its own empty context and has not seen the map.
+    """
+    same = [e for e in session_log.reads(root, session_id, agent_id)
+            if e.get("owner") == owner_rel]
     return len(same) == 1
 
 
@@ -48,10 +54,15 @@ def main() -> int:
         emit({})  # a repo-wide grep/glob names no folder — nothing to attribute
         return 0
 
-    root = repo_root_from(hook_input)
     session_id = str(hook_input.get("session_id", "unknown"))
+    # None = the main session. A subagent is given its PARENT's session_id, so this is the only
+    # thing separating a fan-out of N readers from one session that read N folders.
+    agent_id = agent_id_from(hook_input)
     target = Path(raw_path)
-    resolved = target if target.is_absolute() else (root / target)
+    resolved = target if target.is_absolute() else (repo_root_from(hook_input) / target)
+    # Attribute the read to the FILE's repo, not the session's — a session working across two
+    # repos must keep two honest ledgers rather than one that scores the other repo as unmapped.
+    root = root_for_path(hook_input, resolved)
 
     nudge = None
     try:
@@ -61,19 +72,19 @@ def main() -> int:
                     flip(resolved)  # keep drift honest before the read
                 except Exception:
                     pass
-            entry = session_log.record_read(root, session_id, tool_name, resolved)
+            entry = session_log.record_read(root, session_id, tool_name, resolved, agent_id)
             if entry and entry["kind"] == session_log.KIND_SOURCE_MAPPED and entry.get("owner"):
                 owner_rel = entry["owner"]
-                if not session_log.map_read_this_session(root, session_id, root / owner_rel) \
-                        and _first_source_touch(root, session_id, owner_rel):
+                if not session_log.map_read_this_session(root, session_id, root / owner_rel, agent_id) \
+                        and _first_source_touch(root, session_id, owner_rel, agent_id):
                     nudge = (f"context-os: {owner_rel} maps this folder — reading that small map "
                              "is cheaper than re-reading its source here.")
         else:  # Grep / Glob over a folder
-            entry = session_log.record_explore(root, session_id, tool_name, resolved)
+            entry = session_log.record_explore(root, session_id, tool_name, resolved, agent_id)
             if entry and entry.get("owner"):
                 owner_rel = entry["owner"]
-                if not session_log.map_read_this_session(root, session_id, root / owner_rel) \
-                        and _first_source_touch(root, session_id, owner_rel):
+                if not session_log.map_read_this_session(root, session_id, root / owner_rel, agent_id) \
+                        and _first_source_touch(root, session_id, owner_rel, agent_id):
                     nudge = (f"context-os: {owner_rel} already maps this folder — reading it is "
                              "cheaper than exploring the source.")
     except Exception:
