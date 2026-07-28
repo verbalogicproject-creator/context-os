@@ -5,6 +5,11 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-28
+
+Adds the context-threshold monitor, makes the scanner linear instead of quadratic, and stops
+implying a saving that has never been measured.
+
 ### Changed
 - **The delivered saving is now stated as having no result yet.** README and HOW-TO-USE
   described the map-consultation rate as though a number existed behind it. One does not: the
