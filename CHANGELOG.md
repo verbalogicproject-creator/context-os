@@ -27,6 +27,12 @@ All notable changes to context-os are documented here. Format loosely follows
   unchanged byte for byte, so baselines already committed do not drift on upgrade.
 
 ### Fixed
+- **The injection gate failed honest maps that merely mentioned a system prompt.** `system prompt`
+  was matched as a bare phrase, so an AI project's own architecture doc — "Phase 4 — Integration
+  (System Prompt Injection)" — failed the gate, and a false positive on a real repo blocks a map
+  that is fine. The phrase is now only instruction-shaped when it addresses the agent's own prompt
+  (`your system prompt`) or acts on one (reveal / override / replace / "is now"). Found by
+  dogfooding on a real project; both directions are pinned in `test_injection.py`.
 - **`plan.py` counted context-os's own output.** `index.ngf.md` gave the repo root a node the moment
   the scanner ran, so a second plan on the same repo could disagree with the first — and with the
   merge rule above, that root would then absorb the whole project. Maps and the index are excluded

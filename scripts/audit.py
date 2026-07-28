@@ -444,7 +444,15 @@ _INJECTION_PATTERNS: List[Tuple[str, str]] = [
     (r"disregard\s+(the\s+)?(above|previous|prior|earlier)", "prompt-injection framing"),
     (r"\b(new|updated|revised)\s+instructions?\s*:", "prompt-injection framing"),
     (r"\byou\s+are\s+now\b", "prompt-injection framing"),
-    (r"\bsystem\s+prompt\b", "prompt-injection framing"),
+    # `system prompt` alone is a TOPIC, not a payload — an AI project's own architecture doc
+    # says it constantly ("Phase 4 — Integration (System Prompt Injection)"), and failing that
+    # blocks an honest map. What is instruction-shaped is addressing the agent's own prompt, or
+    # acting on one: reveal / override / replace it.
+    (r"\byour\s+system\s+prompt\b", "prompt-injection framing"),
+    (r"\b(ignore|disregard|override|overwrite|replace|reveal|print|show|leak|disclose|forget|"
+     r"reset|repeat)\b[^\n]{0,40}\bsystem\s+prompt\b", "prompt-injection framing"),
+    (r"\bsystem\s+prompt\b[^\n]{0,25}\b(is\s+now|now\s+reads|says\s+to|instructs\s+you)\b",
+     "prompt-injection framing"),
     (r"--dangerously-skip-permissions", "permission bypass"),
     (r"--no-verify\b", "permission bypass"),
     (r"\bchmod\s+777\b", "permission bypass"),
