@@ -75,6 +75,98 @@ def test_summary_counts_and_selectivity(tmp_path):
     assert s["deep"] < len(plan["folders"])
 
 
+# ---------------------------------------------------------------------------
+# keeps_map — one file per folder over-fragments; one file per repo over-charges
+# ---------------------------------------------------------------------------
+
+
+def _merge_repo(tmp_path):
+    """pkg/ with a real hub, a thin sibling, and a docs folder."""
+    (tmp_path / "pkg").mkdir()
+    for name in ("a", "b", "c", "d"):
+        (tmp_path / "pkg" / f"{name}.py").write_text(f"from pkg.hub.h1 import x\n\ndef {name}():\n    pass\n")
+    (tmp_path / "pkg" / "hub").mkdir()
+    (tmp_path / "pkg" / "hub" / "h1.py").write_text("x = 1\n\ndef helper():\n    pass\n")
+    (tmp_path / "pkg" / "thin").mkdir()
+    (tmp_path / "pkg" / "thin" / "t.py").write_text("from pkg.hub.h1 import x\n\ndef t():\n    pass\n")
+    (tmp_path / "pkg" / "docs").mkdir()
+    (tmp_path / "pkg" / "docs" / "guide.md").write_text("# Guide\n\n## S\ntext\n")
+
+
+def test_thin_folder_merges_up_and_hub_keeps_its_own_map(tmp_path):
+    _merge_repo(tmp_path)
+    plan = plan_mod.compute_plan(tmp_path)
+
+    thin = _row(plan, "pkg/thin")
+    assert thin["keeps_map"] is False
+    assert thin["fold_into"] == "pkg"          # one file is not worth its own map
+
+    hub = _row(plan, "pkg/hub")
+    assert hub["in_degree"] >= plan["params"]["merge_hub_in"]
+    assert hub["keeps_map"] is True            # a hub keeps its card however small
+
+    assert _row(plan, "pkg")["keeps_map"] is True
+    assert "pkg/thin" in _row(plan, "pkg")["absorbs"]
+
+
+def test_merged_folders_are_not_separately_enriched(tmp_path):
+    _merge_repo(tmp_path)
+    plan = plan_mod.compute_plan(tmp_path)
+    enrich = plan["summary"]["enrich"]
+    assert "pkg" in enrich and "pkg/hub" in enrich
+    assert "pkg/thin" not in enrich            # its files are described inside pkg's map
+    assert "pkg/docs" not in enrich
+    assert len(enrich) < plan["summary"]["deep"] + plan["summary"]["skeleton"]
+
+
+def test_code_never_merges_into_a_docs_only_host(tmp_path):
+    """A repo whose root holds only a README must not swallow backend/ into a docs map."""
+    (tmp_path / "README.md").write_text("# Project\n\n## About\ntext\n")
+    (tmp_path / "backend").mkdir()
+    for name in ("main", "models", "util"):
+        (tmp_path / "backend" / f"{name}.py").write_text(f"def {name}():\n    pass\n")
+
+    plan = plan_mod.compute_plan(tmp_path)
+    root = _row(plan, ".")
+    backend = _row(plan, "backend")
+    assert root["code_files"] == 0 and root["keeps_map"] is True
+    assert backend["keeps_map"] is True        # kept, despite being thin enough to merge
+    assert backend["fold_into"] is None
+
+
+def test_plan_ignores_its_own_maps_so_a_second_run_agrees(tmp_path):
+    """The plan must give the same answer before and after an emit — `index.ngf.md` at the root
+    would otherwise make the root a map-keeping folder that absorbs the whole repo."""
+    _merge_repo(tmp_path)
+    before = {r["folder"]: (r["keeps_map"], r["fold_into"]) for r in plan_mod.compute_plan(tmp_path)["folders"]}
+
+    scan.write_ngf_skeletons(tmp_path, scan.scan(tmp_path))
+    after = {r["folder"]: (r["keeps_map"], r["fold_into"]) for r in plan_mod.compute_plan(tmp_path)["folders"]}
+
+    assert before == after
+
+
+def test_apply_fold_moves_code_nodes_and_their_digest(tmp_path):
+    _merge_repo(tmp_path)
+    result = scan.scan(tmp_path)
+    scan.write_ngf_skeletons(tmp_path, result)
+    scan.write_digests(tmp_path, result)
+    assert (tmp_path / "pkg" / "thin" / "map-thin.ngf.md").is_file()
+    assert (tmp_path / ".context-os" / "digests" / "pkg/thin" / "digest.txt").is_file()
+
+    folded = plan_mod.apply_fold(tmp_path)
+
+    assert {f["folder"] for f in folded["folded"]} >= {"pkg/thin", "pkg/docs"}
+    assert not (tmp_path / "pkg" / "thin" / "map-thin.ngf.md").exists()
+    pkg_map = (tmp_path / "pkg" / "map-pkg.ngf.md").read_text()
+    assert "Folded: pkg/thin/" in pkg_map and "t" in pkg_map
+    assert (tmp_path / "pkg" / "hub" / "map-hub.ngf.md").is_file()   # the hub kept its own
+    # the digest moved too — otherwise pkg's enricher gets a node it was given nothing about
+    assert not (tmp_path / ".context-os" / "digests" / "pkg/thin" / "digest.txt").exists()
+    assert "merged from pkg/thin/" in (tmp_path / ".context-os" / "digests" / "pkg" / "digest.txt").read_text()
+    assert audit.check_maps_fabrication(tmp_path).ok
+
+
 def test_apply_fold_merges_content_into_parent(tmp_path):
     (tmp_path / "app").mkdir()
     (tmp_path / "app" / "main.py").write_text("def m():\n    pass\n")

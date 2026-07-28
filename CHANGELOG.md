@@ -5,6 +5,33 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+- **A folder no longer automatically gets its own map file.** One map per folder over-fragments a
+  small project — five folders holding one file each cost five reads and five headers — while one
+  map for a whole repo makes every session pay for the parts it isn't touching. `plan.py` now makes
+  a second, separate decision per folder: whether it earns its own file. A folder too thin to
+  (no code, peripheral code, or few files that little depends on) **merges** into its nearest
+  map-keeping ancestor; an import hub keeps its own card however small, because the folders
+  everything imports are exactly the ones worth reading alone. Nothing is dropped — a merged
+  folder's nodes move into the map that absorbed it. On a real 17-folder project this went from
+  15 map files and 10 enricher calls to 6 and 5. Tune with `--merge-max-files` / `--merge-hub-in`,
+  or keep the old behaviour with `--all`.
+- **`--apply-fold` now runs before enrichment, not after.** A merged *code* node arrives carrying
+  only its path, so the absorbing map's enricher has to see it to describe it. The folder's
+  structural digest moves with it, for the same reason. (Content nodes were always safe to merge
+  late — the scanner had already described them.)
+- **A map's drift signature now covers the folders it absorbed.** `signature` descends into every
+  descendant with no map of its own — the same set `owning_map` already resolved to that map.
+  Without this, editing a merged folder would flip the parent map's hook but never change its hash,
+  leaving a map that silently goes stale, which is worse than no map. For a leaf folder the hash is
+  unchanged byte for byte, so baselines already committed do not drift on upgrade.
+
+### Fixed
+- **`plan.py` counted context-os's own output.** `index.ngf.md` gave the repo root a node the moment
+  the scanner ran, so a second plan on the same repo could disagree with the first — and with the
+  merge rule above, that root would then absorb the whole project. Maps and the index are excluded
+  from the tally now, and a test pins that the plan is the same before and after an emit.
+
 ## [0.6.0] — 2026-07-28
 
 Two things a session could not do before: leave a handoff the next one can actually start from,

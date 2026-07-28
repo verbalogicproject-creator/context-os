@@ -84,30 +84,76 @@ _STRUCT_RE = re.compile(
 # Signature
 # ---------------------------------------------------------------------------
 
+# Directories that never carry architecture — skipped when a map's signature descends.
+_SKIP_DIRS = frozenset(
+    {
+        "node_modules", "__pycache__", "venv", ".venv", "dist", "build",
+        "target", "vendor", "coverage", ".git", ".context-os",
+    }
+)
 
-def signature(folder: Path) -> str:
-    """A cheap, order-insensitive, non-recursive signature of a folder's architecture.
 
-    Bounded by one folder's source files (not the repo) — typically <50ms.
-    """
-    parts: List[str] = []
+def _owns_a_map(folder: Path) -> bool:
+    """True if `folder` carries its own `map-*.ngf.md` — then an ancestor does not cover it."""
     try:
-        names = sorted(os.listdir(folder))
+        return any(_is_map_file(p) for p in folder.iterdir() if p.is_file())
     except OSError:
-        return "sha256:" + hashlib.sha256(b"").hexdigest()[:16]
-    for name in names:
-        path = folder / name
-        if not path.is_file() or path.suffix not in SRC_EXT:
-            continue
-        hits: List[str] = []
+        return False
+
+
+def _covered_dirs(folder: Path) -> List[Path]:
+    """`folder` plus every descendant it is responsible for — down to, not into, any folder
+    that owns its own map.
+
+    This mirrors `owning_map` exactly: a map documents its folder and every descendant with
+    no map of its own. The two rules have to agree, or a folder merged into its parent's map
+    would edit-flip that parent while never changing its signature — a map that silently goes
+    stale, which is worse than no map. Bounded by one map's subtree, and it stops at the first
+    folder that owns a map.
+    """
+    covered = [folder]
+    stack = [folder]
+    while stack:
+        current = stack.pop()
         try:
-            with open(path, encoding="utf-8", errors="ignore") as handle:
-                for line in handle:
-                    if _STRUCT_RE.match(line):
-                        hits.append(re.sub(r"\s+", " ", line.strip()))
+            children = sorted(p for p in current.iterdir() if p.is_dir())
         except OSError:
             continue
-        parts.append(name + "\n" + "\n".join(sorted(hits)))
+        for child in children:
+            if child.name.startswith(".") or child.name in _SKIP_DIRS or _owns_a_map(child):
+                continue
+            covered.append(child)
+            stack.append(child)
+    return covered
+
+
+def signature(folder: Path) -> str:
+    """A cheap, order-insensitive signature of the architecture one map is responsible for.
+
+    Covers `folder` and every descendant without a map of its own (see `_covered_dirs`), so a
+    thin folder merged into its parent still drifts that parent. For a leaf folder — the common
+    case — this is exactly the old single-folder hash, byte for byte.
+    """
+    parts: List[str] = []
+    for directory in _covered_dirs(folder):
+        try:
+            names = sorted(os.listdir(directory))
+        except OSError:
+            continue
+        for name in names:
+            path = directory / name
+            if not path.is_file() or path.suffix not in SRC_EXT:
+                continue
+            hits: List[str] = []
+            try:
+                with open(path, encoding="utf-8", errors="ignore") as handle:
+                    for line in handle:
+                        if _STRUCT_RE.match(line):
+                            hits.append(re.sub(r"\s+", " ", line.strip()))
+            except OSError:
+                continue
+            parts.append(path.relative_to(folder).as_posix() + "\n" + "\n".join(sorted(hits)))
+    parts.sort()
     blob = "\n--\n".join(parts)
     return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 

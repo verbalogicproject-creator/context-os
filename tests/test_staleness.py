@@ -1,5 +1,7 @@
 """The structural-hash drift engine: semantic (not temporal) change detection + frontmatter I/O."""
 
+import hashlib
+
 import pytest
 
 import ctx_staleness
@@ -42,6 +44,48 @@ def test_new_file_drifts(tmp_path):
     ctx_staleness.stamp(map_path)
     (map_path.parent / "n.py").write_text("def g():\n    pass\n")
     assert ctx_staleness.flip(map_path).startswith("DRIFTED")
+
+
+def test_merged_child_folder_drifts_the_parent_map(tmp_path):
+    """A folder merged into its parent's map has no map of its own, so the parent is responsible
+    for it — and a signature that stopped at the parent's own files would leave that map silently
+    stale. `owning_map` already routes the edit here; the signature has to cover the same set."""
+    map_path = _setup(tmp_path)
+    (tmp_path / "pkg" / "thin").mkdir()
+    (tmp_path / "pkg" / "thin" / "t.py").write_text("def t():\n    pass\n")
+    ctx_staleness.stamp(map_path)
+
+    # the hook resolves an edit inside the merged child to this parent map...
+    assert ctx_staleness.owning_map(tmp_path, tmp_path / "pkg" / "thin" / "t.py") == map_path
+    # ...and the parent's signature must actually notice the change
+    (tmp_path / "pkg" / "thin" / "t.py").write_text("import json\ndef t():\n    pass\n")
+    assert ctx_staleness.flip(map_path).startswith("DRIFTED")
+
+
+def test_a_folder_with_its_own_map_is_not_in_an_ancestors_signature(tmp_path):
+    """The other half of the same rule: a folder that kept its own map is its own business, so
+    changing it must NOT drift the ancestor — or every hub edit would flag two maps."""
+    map_path = _setup(tmp_path)
+    (tmp_path / "pkg" / "hub").mkdir()
+    (tmp_path / "pkg" / "hub" / "h.py").write_text("def h():\n    pass\n")
+    scan.write_ngf_skeletons(tmp_path, scan.scan(tmp_path))
+    assert (tmp_path / "pkg" / "hub" / "map-hub.ngf.md").is_file()
+    ctx_staleness.stamp(map_path)
+
+    (tmp_path / "pkg" / "hub" / "h.py").write_text("import os\ndef h():\n    pass\n")
+    assert ctx_staleness.flip(map_path) == "verified"
+
+
+def test_leaf_folder_hashes_exactly_as_before_the_descent(tmp_path):
+    """The common case — a folder with no subfolders — must hash byte-identically to the
+    single-folder engine, or every `structural_hash` already committed in the wild drifts on
+    upgrade. Computed here from the documented blob format, not from the function under test."""
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "m.py").write_text("import os\ndef f():\n    pass\n")
+
+    blob = "m.py\ndef f():\nimport os"          # one part: name, then its struct lines, sorted
+    expected = "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+    assert ctx_staleness.signature(tmp_path / "pkg") == expected
 
 
 def test_unstamped_when_no_baseline(tmp_path):

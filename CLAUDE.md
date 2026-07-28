@@ -24,16 +24,25 @@ example of its output, see `demo/`, which carries real, committed maps.)
   drift hooks that keep each map's `staleness` flag honest.
 - `scripts/` — stdlib-only, offline:
   - `scan.py` — deterministic scanner + the per-folder `.ngf.md` emit (`--emit-ngf`).
-  - `plan.py` — deterministic folder ranker (DEEP/SKELETON/FOLD) from the scan graph, so
-    `/context-os` enriches only strategic folders (`--deep-only`) and folds content into
-    parents (`--apply-fold`). No LLM.
+  - `plan.py` — deterministic folder ranker from the scan graph, two decisions per folder and
+    no LLM. **Tier** (DEEP/SKELETON/FOLD) = how much it is worth describing → `--deep-only` is
+    the enrich list. **`keeps_map`** = whether it earns its own map file; a folder too thin to
+    (no code, SKELETON, or ≤ `merge_max_files` that little depends on) merges into its nearest
+    map-keeping ancestor via `--apply-fold`, while an import hub (`in_degree ≥ merge_hub_in`)
+    keeps its card however small. `--apply-fold` runs **before** enrichment — a merged code node
+    arrives with only its path, so the absorbing map's enricher must see it. Code never merges
+    into a code-free host, and the plan ignores context-os's own `map-*`/`index.ngf.md` so it
+    gives the same answer before and after an emit.
   - `claudemd_splice.py` — the ONLY code path allowed to write the CLAUDE.md/AGENTS.md
     marked block.
   - `audit.py` — the `.ngf.md`-aware `.ctx` parser + `check` (derive-don't-fabricate, + an
     advisory dangling-edge pass) + `savings` (the CEILING) + `session-savings` (DELIVERED) +
     `repair-targets` (folders the orchestrator re-enriches when an enricher left a bad map).
   - `ctx_staleness.py` — the structural-hash engine (`signature`/`stamp`/`flip`/`status`);
-    map writes are atomic and malformed frontmatter fails loudly.
+    map writes are atomic and malformed frontmatter fails loudly. `signature` covers the folder
+    **plus every descendant with no map of its own** — the same set `owning_map` resolves to that
+    map, so a merged folder still drifts the map that absorbed it. For a leaf folder it is the
+    old single-folder hash, byte for byte (`test_leaf_folder_hashes_exactly_as_before_the_descent`).
   - `session_log.py` — the per-session read ledger (`.context-os/reads-<session>.jsonl`):
     classifies each Read/Grep/Glob as map / source-in-mapped-folder / explore. The behavioral
     ground truth for "did the agent read the map?".

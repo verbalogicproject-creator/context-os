@@ -21,10 +21,16 @@ The deterministic scanner + drift stamp + pointer splice + fabrication audit are
 all three; only the enrichment differs.
 
 **Strategic by default (map what matters).** On the enriched tiers, `/context-os` first *ranks*
-folders (`plan.py`) and enriches only the **DEEP** ones — folders with real code or that other
-folders import; small/peripheral folders keep a free skeleton, and pure docs/data folders fold
-into their parent. So a big repo pays for the handful that carry the architecture, not every
-folder. Pass **`--all`** to enrich every folder the old way.
+folders (`plan.py`) and enriches only the ones carrying architecture — folders with real code or
+that other folders import. Pass **`--all`** to enrich every folder the old way.
+
+**One map per folder is not the goal — one map per thing worth reading is.** A map costs tokens
+every time a session reads it, so a folder holding one file does not earn its own file, and a
+whole repo in one file makes every session pay for the parts it isn't touching. `plan.py` decides
+this per folder: a folder too thin to earn a map (no code, peripheral code, or few files that
+little depends on) **merges** into its nearest map-keeping ancestor, while an import **hub** keeps
+its own card however small. Nothing is dropped — a merged folder's nodes move into that ancestor's
+map. Tune with `--merge-max-files` / `--merge-hub-in`.
 
 ## Request
 
@@ -44,33 +50,44 @@ $ARGUMENTS
    This writes one `map-{folder}.ngf.md` per folder + `index.ngf.md`, and (for the enriched
    tiers) a per-folder structural digest under `<root>/.context-os/digests/`.
 
-3. **Plan — choose what to enrich** (default; skip for `--skeleton`; `--all` maps every folder):
+3. **Plan — choose what keeps a map, and what to enrich** (default; skip for `--skeleton`; `--all`
+   maps every folder):
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/plan.py" "<root>"                # ranked table
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/plan.py" "<root>" --deep-only     # just the enrich list
    ```
-   `plan.py` ranks every folder from the scan graph into **DEEP** (real code, or an import hub →
-   enrich), **SKELETON** (small/peripheral code → keep the free skeleton, no enricher), and **FOLD**
-   (pure docs/data/config → merged into its parent in step 6). Take the `--deep-only` list. Optionally
+   Two decisions per folder. **Tier** — how much it is worth describing: **DEEP** (real code, or an
+   import hub), **SKELETON** (small/peripheral code), **FOLD** (pure docs/data/config). **`MAP`** —
+   whether it earns its own file: `own` keeps one, `↑` merges into the named ancestor. Take the
+   `--deep-only` list (folders that keep a map *and* carry code, their own or absorbed). Optionally
    **adjust the `*`-flagged borderline folders** — promote a thin-but-critical entry, or demote a
-   big-but-boilerplate folder — a handful, each with a one-line reason. Never touch the clear DEEP or
-   FOLD cases. This is the difference between mapping what matters and blindly mapping every folder.
+   big-but-boilerplate folder — a handful, each with a one-line reason. Never touch the clear cases.
 
-4. **Enrich** — branch on the tier:
+4. **Merge the thin folders in — BEFORE enriching** (default; skip for `--all`):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/plan.py" "<root>" --apply-fold
+   ```
+   Each merged folder's nodes move into its ancestor's map, its own map and index row are dropped, and
+   its structural digest is folded into the ancestor's. **Order matters:** a merged *code* node arrives
+   carrying only its path, so the ancestor's enricher has to see it in order to describe it. Enrich
+   first and those nodes stay undescribed. (Content nodes were always safe to move late — the scanner
+   had already described them — which is why this step used to sit at the end.)
 
-   - **`--skeleton`/`--fast`:** skip enrichment entirely. Go straight to step 5.
+5. **Enrich** — branch on the tier:
 
-   - **default / `--premium`:** **dispatch one `context-os:map-enricher` agent per DEEP folder** (plus
-     any borderline you promoted; for `--all`, every folder), in **parallel batches of ~8–12** (wait
-     for each batch before the next). Give each `{project_root, folder}`. For **`--premium`**, dispatch
-     each enricher on the **Sonnet** model; otherwise its default (Haiku). Each enricher fills its own
-     map's descriptions, edges, and risk card in isolation and returns one line. If an enricher fails,
-     note the folder and continue — its map stays a valid skeleton. SKELETON and FOLD folders are left
-     as their deterministic maps (FOLD content is already described by the scanner).
-     Then **enrich the index yourself**: give each DEEP folder's node in `index.ngf.md` a one-line
+   - **`--skeleton`/`--fast`:** skip enrichment entirely. Go straight to step 7.
+
+   - **default / `--premium`:** **dispatch one `context-os:map-enricher` agent per folder on the enrich
+     list** (plus any borderline you promoted; for `--all`, every folder), in **parallel batches of
+     ~8–12** (wait for each batch before the next). Give each `{project_root, folder}`. For
+     **`--premium`**, dispatch each enricher on the **Sonnet** model; otherwise its default (Haiku).
+     Each enricher fills its own map's descriptions, edges, and risk card in isolation and returns one
+     line — including the nodes that map absorbed, which is why it is dispatched after step 4. If an
+     enricher fails, note the folder and continue — its map stays a valid skeleton.
+     Then **enrich the index yourself**: give each remaining folder's node in `index.ngf.md` a one-line
      description derived from that folder's now-enriched map (cheap — read each map's title line).
 
-5. **Repair loop** (enriched tiers only — skip for `--skeleton`): before folding/stamping, catch any
+6. **Repair loop** (enriched tiers only — skip for `--skeleton`): before stamping, catch any
    map an enricher left broken. Default Haiku output is not always ship-clean first-pass — the two
    common slips are a renamed node (a disambiguated `dir/stem` name shortened to its bare stem → fails
    the fabrication gate) and a prose edge target (`~> chat store for messages` instead of `~> chat`).
@@ -82,14 +99,6 @@ $ARGUMENTS
    (`scan.py "<root>" --emit-ngf`), re-dispatch a `context-os:map-enricher`, then run `repair-targets`
    again. Repeat at most **2 rounds**. If a folder still fails after 2 rounds, leave it, name it in the
    report, and suggest `--premium` or a manual look — never hand-fix the map yourself.
-
-6. **Fold content folders into their parent** (default; skip for `--all`): merge each FOLD folder's
-   deterministic content nodes into its parent map, and drop its own map + index row — so the map set
-   is the folders that carry architecture, not every docs/data folder (nothing vanishes; the content
-   moves into the parent).
-   ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/plan.py" "<root>" --apply-fold
-   ```
 
 7. **Stamp the drift baseline** (all tiers):
    ```bash
@@ -109,8 +118,9 @@ $ARGUMENTS
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" check "<root>"
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/audit.py" savings "<root>"
    ```
-   `check` must PASS (every node traces to a real file). Report: the tier used, how many folders were
-   DEEP-enriched vs SKELETON vs FOLDed (and any borderline you adjusted), any folders the repair loop
+   `check` must PASS (every node traces to a real file). Report: the tier used, how many map files the
+   project ended up with and how many folders merged into an ancestor, how many were enriched (and any
+   borderline you adjusted), any folders the repair loop
    re-ran (and any it couldn't fix), the pointer splice result, the `check` result, and the `savings`
    line. If `check` still fails after the repair loop, surface it plainly — do not report success.
 
