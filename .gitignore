@@ -17,6 +17,10 @@ dist/
 # Data artifacts this plugin must never ship
 *.db
 
+# Raw AST inventory dumps — the readable output is CODEBASE-REPORT.md, which is committed;
+# the JSON is a regenerable intermediate and nothing references it.
+docs/inventory-*.json
+
 # Timestamped backups produced by scripts/claudemd_splice.py
 *.bak
 
