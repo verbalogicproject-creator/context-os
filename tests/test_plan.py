@@ -201,3 +201,31 @@ def test_apply_fold_merges_content_into_parent(tmp_path):
     assert "guide" in app_map
     assert "app/docs :" not in (tmp_path / "index.ngf.md").read_text()  # index row pruned
     assert audit.check_maps_fabrication(tmp_path).ok                    # still all-real, gate passes
+
+
+def test_merging_code_folders_is_off_by_default_and_stays_off(tmp_path):
+    """The default nobody was pinning. Merging shipped once, measured negative within the hour
+    (12 of 15 folders cost MORE, none less), and was reverted — but only the opt-in path had a
+    test, so a refactor could have flipped the default back silently, which is how the rule
+    shipped in the first place.
+
+    The cost model in plan.py closes it for good: a merge saves at most one ~79-token header and
+    costs ~146 tokens of foreign content whenever a task touches only one of the pair, so two
+    folders must be co-accessed on >65% of tasks to break even. Same fixture as the opt-in test
+    above, opposite outcome — that contrast IS the guarantee.
+    """
+    assert plan_mod.DEFAULT_MERGE_MAX_FILES == 0
+
+    _merge_repo(tmp_path)
+    plan = plan_mod.compute_plan(tmp_path)                  # defaults, no flags
+
+    thin = _row(plan, "pkg/thin")
+    assert thin["keeps_map"] is True, "a thin CODE folder keeps its own map by default"
+    assert thin["fold_into"] is None
+
+    # code-free folders still fold — that behaviour predates the merge rule and was always right
+    assert _row(plan, "pkg/docs")["keeps_map"] is False
+
+    # and the escape hatch still works, so this pins the default without deleting the feature
+    opted_in = plan_mod.compute_plan(tmp_path, merge_max_files=4)
+    assert _row(opted_in, "pkg/thin")["keeps_map"] is False

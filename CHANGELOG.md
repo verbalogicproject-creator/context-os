@@ -5,6 +5,22 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+- **Merging code folders is now closed as refuted, not merely off.** The comment in `plan.py`
+  said turning it on "should be EARNED" from the read ledger — pointing the next reader at work
+  that the arithmetic cannot justify. The map set decomposes as `N_maps x fixed_cost + content`;
+  measured on a real 17-map project, a map's fixed cost is ~79 tokens and its mean content ~146.
+  Merging two folders therefore saves at most one 79-token header, and only when a task touches
+  both, while a task touching one of the pair pays the other's 146 — so **break-even needs the
+  two folders read together on more than 65% of tasks**, and the bar climbs steeply for clusters.
+  The upside is capped at one small header; the downside is uncapped and was measured at 6.7x.
+  Collecting co-access data would not change that, so the cost model now sits beside the knobs
+  in `plan.py`, and `test_plan.py` pins the default at 0 — nothing pinned it before, so a
+  refactor could have flipped it back silently, which is how the rule shipped the first time.
+  The flags remain as an escape hatch, not a recommendation. The same model sets the direction
+  for future work: attack `fixed_cost`, not `N_maps` — every token cut from the header lowers
+  the 79 and raises the 0.65.
+
 ## [0.8.1] — 2026-07-29
 
 ### Fixed

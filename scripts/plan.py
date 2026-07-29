@@ -73,9 +73,34 @@ DEFAULT_HUB_IN = 2
 # leaves only the original FOLD behaviour (code-free docs/data folders merge into their
 # parent, which was always right — they carry no architecture of their own).
 #
-# Turning it on should be EARNED, not guessed: the read ledger records which folders a session
-# touched, so folders genuinely read together are the ones worth sharing a map. Until that is
-# wired, these are opt-in flags and the numbers above are the reason.
+# The plan was to EARN merging from the read ledger — folders genuinely read together are the
+# ones worth sharing a map. That is now closed, because the cost model says the ledger cannot
+# rescue it. Decompose the map set:
+#
+#     total = N_maps x fixed_cost + content
+#
+# Merging reduces N_maps. Measured on a real 17-map project: the fixed cost of a map (the
+# frontmatter plus the ctx header) is ~79 tokens, and the mean content of one is ~146 tokens.
+# So merging two folders saves at most ONE fixed block, 79 tokens — and only on a task that
+# touches both. A task touching just one of the pair pays the other's 146 tokens of content.
+# Break-even is therefore
+#
+#     p(read together) > 146 / (146 + 79)  ~=  0.65
+#
+# Two folders must be co-accessed on MORE THAN 65% of tasks before merging them breaks even,
+# and the bar climbs steeply for clusters (the refuted rule merged nine). No plausible ledger
+# makes that pay: the upside is capped at one small header while the downside is uncapped and
+# was measured at 6.7x. Collecting co-access data would not change the arithmetic.
+#
+# This also settles the direction of future work: attack `fixed_cost`, not `N_maps`. Shrinking
+# the per-map overhead is free — no dilution, no behavioural assumption — and it makes merging
+# strictly worse, because every token cut from the header lowers the 79 and raises the 0.65.
+# Make the unit cheap rather than making fewer units; fewer units costs the property that makes
+# maps work at all, which is loading only what the task needs.
+#
+# The flags below stay as an ESCAPE HATCH for a repo whose folders really are read together —
+# they are not a recommendation, and they are not a default anyone should reach for.
+# `test_plan.py` pins the default at 0 so it cannot drift back on quietly.
 DEFAULT_MERGE_MAX_FILES = 0
 DEFAULT_MERGE_HUB_IN = 5
 
