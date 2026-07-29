@@ -5,6 +5,17 @@ All notable changes to context-os are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-29
+
+### Fixed
+- **`.context-os/` still showed as untracked in every mapped project.** Its nested ignore file
+  listed `digests/`, `reads-*.jsonl` and `relay.ngf.md` — but not itself, so git saw one unignored
+  file and reported the whole directory. That is the same complaint the nested ignore file was
+  added to fix; it stopped one file short. git still reads an ignore file excluded by its own
+  patterns, so self-ignoring costs nothing and makes the directory genuinely invisible. `state/`
+  is listed for the same reason. Found by the relay cold-read gate, which flagged that the handoff
+  claimed a clean tree while its own frontmatter said otherwise.
+
 ## [0.8.0] — 2026-07-28
 
 Adds the context-threshold monitor, makes the scanner linear instead of quadratic, and stops
