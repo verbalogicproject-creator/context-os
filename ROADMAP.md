@@ -92,6 +92,35 @@ branch switches, teammates, or non-agent edits.
   drift; add a documented GitHub Actions job (`git diff --exit-code` after regen) and an
   optional auto-regenerate-and-open-PR workflow (with bot-loop guards + a `paths:` filter).
 
+## `relay.py capture --refresh` — re-derive the mechanical half without destroying the authored half
+
+Today `capture` writes both halves and `--force` overwrites everything, so the moment a session
+commits again after capturing, the frontmatter is stale (`git_head`, `git_dirty`, the test count
+and any line-count tripwires in the body) and the only way to fix it is editing those values by
+hand. That is exactly the wrong thing to hand-maintain: they are derived, and a handoff whose
+stated SHA does not match `HEAD` fails the first check a resuming session runs.
+
+Measured cost of not having it: on 2026-07-29 a single relay went through **five** cold-read gate
+rounds, and most of the score dips were hand-patched derived values drifting out of sync again —
+not gaps in the handoff's content. The gate was measuring bookkeeping, not resumability.
+
+**Fix:** `capture --refresh` recomputes only the mechanical fields (git state, map hashes,
+`touched`, prefix) and leaves every authored section byte-identical. Should be safe to run
+repeatedly, right up to the moment the session ends.
+
+## A relay should point at the plan, not absorb it
+
+The cold-read gate requires the reader to open exactly one file, which pressures the capturing
+session to inline everything a resumer might need. On 2026-07-29 that turned one item's
+acceptance criteria into a mini design doc *inside* the handoff — task-generation algorithm,
+execution mechanism, JSON schemas — and the relay grew while the remaining work shrank. That
+inversion is the tell.
+
+**Fix:** decide (and document) where the line sits. A relay should carry the *decision* and a
+path; the *design* belongs in the plan file it points at. Candidate rule: if a section would
+still be true after the next session finishes, it belongs in the plan, not the relay. Relates to
+the 16,000-character budget, which currently limits the symptom rather than the cause.
+
 ## Merkle-tree structural hash
 
 Restructure `structural_hash` as a Merkle tree — a folder's hash = hash of its children's
