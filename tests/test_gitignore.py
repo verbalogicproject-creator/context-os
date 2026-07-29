@@ -152,3 +152,15 @@ def test_compress_is_secret_file_covers_the_dotenv_family():
     assert compress.is_secret_file(Path("backend.env"))
     assert not compress.is_secret_file(Path("environment.json"))
     assert not compress.is_secret_file(Path("settings.json"))
+
+
+def test_the_local_ignore_file_ignores_itself_and_the_state_dir(tmp_path):
+    """Otherwise `.context-os/` still shows as untracked in every mapped project — the exact
+    complaint the nested-ignore change set out to fix. The ignore file is not ignored by its own
+    patterns, so git reports the directory; git still READS an ignored .gitignore, so
+    self-ignoring costs nothing and makes the directory genuinely invisible."""
+    import session_log
+    session_log.ensure_log_dir(tmp_path)
+    text = (tmp_path / ".context-os" / ".gitignore").read_text()
+    assert ".gitignore" in text.splitlines()
+    assert "state/" in text.splitlines()

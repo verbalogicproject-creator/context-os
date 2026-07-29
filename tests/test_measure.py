@@ -149,7 +149,9 @@ def test_local_artifacts_ignore_themselves_from_inside(tmp_path):
     assert ignore.is_file()
     body = ignore.read_text()
     rules = [ln.strip() for ln in body.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
-    assert set(rules) == {"digests/", "reads-*.jsonl", "relay.ngf.md"}
+    # `.gitignore` and `state/` are listed so the directory is genuinely invisible: without the
+    # self-reference, one unignored file made git report `?? .context-os/` in every mapped project.
+    assert set(rules) == {"digests/", "reads-*.jsonl", "relay.ngf.md", "state/", ".gitignore"}
     assert not any("map-" in rule for rule in rules)   # maps are meant to be committed
 
 

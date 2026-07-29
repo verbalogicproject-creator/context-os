@@ -47,6 +47,8 @@ LOCAL_IGNORE_TEXT = """\
 digests/
 reads-*.jsonl
 relay.ngf.md
+state/
+.gitignore
 """
 
 
